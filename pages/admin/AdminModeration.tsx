@@ -1,35 +1,51 @@
-
 import React, { useState, useEffect } from 'react';
 import { Check, X, FileText, ExternalLink, RefreshCw, Flag, AlertTriangle, EyeOff, Ban, User, Sparkles, MessageSquare, Loader2, ChevronRight } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { notificationService } from '../../services/notificationService';
 import { moderationService, Report } from '../../services/moderationService';
 import { reviewService } from '../../services/reviewService';
+import { kycService } from '../../services/kycService';
 import { GoogleGenAI } from "@google/genai";
 
 // Initialize AI for this component
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-const INITIAL_MOCK_KYC = [
-    { id: 'kyc-1', providerName: 'Traiteur Délice', email: 'contact@delice.fr', submittedAt: '2024-06-25 10:30', docType: 'KBIS + ID', siret: '883 123 456 00012', city: 'Lyon' },
-];
+type KycQueueItem = {
+  id: string;
+  userId: string;
+  providerName: string;
+  email: string;
+  submittedAt: string;
+  docType: string;
+  idDocPath?: string;
+  selfieDocPath?: string;
+  siret?: string;
+  city?: string;
+};
 
 const REJECTION_REASONS = [
-    "Document illisible ou flou",
-    "Pièce d'identité expirée",
-    "Nom ne correspond pas au profil",
-    "Photo (Selfie) ne correspond pas à la pièce d'identité",
-    "Document incomplet (Recto/Verso manquant)",
-    "Autre raison"
+  "Document illisible ou flou",
+  "Pièce d'identité expirée",
+  "Nom ne correspond pas au profil",
+  "Photo (Selfie) ne correspond pas à la pièce d'identité",
+  "Document incomplet (Recto/Verso manquant)",
+  "Autre raison"
 ];
 
 export const AdminModeration: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'kyc' | 'reports'>('kyc');
-  const [kycQueue, setKycQueue] = useState<any[]>([]);
+  const [kycQueue, setKycQueue] = useState<KycQueueItem[]>([]);
   const [reportQueue, setReportQueue] = useState<Report[]>([]);
   
   // Viewer Modal State
-  const [selectedKycItem, setSelectedKycItem] = useState<any | null>(null);
+  const [selectedKycItem, setSelectedKycItem] = useState<KycQueueItem | null>(null);
+
+  const [docUrls, setDocUrls] = useState<{ idUrl: string | null; selfieUrl: string | null; loading: boolean; error: string | null }>({
+      idUrl: null,
+      selfieUrl: null,
+      loading: false,
+      error: null
+  });
 
   // Rejection Flow State
   const [rejectingId, setRejectingId] = useState<string | null>(null);
@@ -38,20 +54,47 @@ export const AdminModeration: React.FC = () => {
   const [aiMessage, setAiMessage] = useState<string>("");
   const [isAiLoading, setIsAiLoading] = useState<boolean>(false);
 
-  const loadData = () => {
-      // Load KYC
-      const storedKyc = localStorage.getItem('admin_kyc_queue');
-      const dynamicKyc = storedKyc ? JSON.parse(storedKyc) : [];
-      setKycQueue([...dynamicKyc, ...INITIAL_MOCK_KYC]);
+  const loadData = async () => {
+      try {
+          const reqs = await kycService.listPendingKycRequests();
+          const mapped: KycQueueItem[] = reqs.map(r => ({
+              id: r.id,
+              userId: r.user_id,
+              providerName: r.provider_name || '—',
+              email: r.email || '—',
+              submittedAt: new Date(r.created_at).toLocaleString(),
+              docType: 'Identité + Selfie',
+              idDocPath: r.id_doc_path || undefined,
+              selfieDocPath: r.selfie_doc_path || undefined
+          }));
+          setKycQueue(mapped);
+      } catch (e) {
+          console.error('KYC load failed', e);
+          setKycQueue([]);
+      }
 
-      // Load Reports
       const reports = moderationService.getReports().filter(r => r.status === 'pending');
       setReportQueue(reports);
   };
 
   useEffect(() => {
-      loadData();
+      void loadData();
   }, []);
+
+  useEffect(() => {
+      const run = async () => {
+          if (!selectedKycItem) return;
+          setDocUrls({ idUrl: null, selfieUrl: null, loading: true, error: null });
+          try {
+              const idUrl = selectedKycItem.idDocPath ? await kycService.getSignedDocumentUrl(selectedKycItem.idDocPath) : null;
+              const selfieUrl = selectedKycItem.selfieDocPath ? await kycService.getSignedDocumentUrl(selectedKycItem.selfieDocPath) : null;
+              setDocUrls({ idUrl, selfieUrl, loading: false, error: null });
+          } catch (err: any) {
+              setDocUrls({ idUrl: null, selfieUrl: null, loading: false, error: String(err?.message || err) });
+          }
+      };
+      void run();
+  }, [selectedKycItem]);
 
   // --- AI Generation ---
   const generateAiRejectionMessage = async () => {
@@ -96,27 +139,21 @@ export const AdminModeration: React.FC = () => {
 
   const handleConfirmRejection = async () => {
       if (!rejectingId) return;
-      
-      const newQueue = kycQueue.filter(q => q.id !== rejectingId);
-      setKycQueue(newQueue);
-      
-      const dynamicItems = newQueue.filter(q => !INITIAL_MOCK_KYC.find(i => i.id === q.id));
-      localStorage.setItem('admin_kyc_queue', JSON.stringify(dynamicItems));
-      
-      if (rejectingId === 'provider-current-session') {
-          localStorage.setItem('provider_kyc_status', 'rejected');
-      }
 
-      // Send notification with the AI generated message
+      const item = kycQueue.find(q => q.id === rejectingId) || selectedKycItem;
+      if (!item) return;
+
+      await kycService.rejectKycRequest(item.id, item.userId, aiMessage);
+      await kycService.sendKycStatusEmail({ userId: item.userId, status: 'rejected', reason: aiMessage });
+
       await notificationService.send({
-          userId: rejectingId,
+          userId: item.userId,
           template: 'kyc_status',
-          data: { 
-              status: 'Refusé',
-              reason: aiMessage 
-          },
-          channels: ['email', 'push']
+          data: { status: 'Refusé', reason: aiMessage },
+          channels: ['push']
       });
+
+      setKycQueue(prev => prev.filter(q => q.id !== item.id));
       
       setRejectingId(null);
       setSelectedKycItem(null);
@@ -124,23 +161,20 @@ export const AdminModeration: React.FC = () => {
   };
 
   const handleApprove = async (id: string) => {
-      const newQueue = kycQueue.filter(q => q.id !== id);
-      setKycQueue(newQueue);
-      
-      const dynamicItems = newQueue.filter(q => !INITIAL_MOCK_KYC.find(i => i.id === q.id));
-      localStorage.setItem('admin_kyc_queue', JSON.stringify(dynamicItems));
-      
-      if (id === 'provider-current-session') {
-          localStorage.setItem('provider_kyc_status', 'verified');
-      }
+      const item = kycQueue.find(q => q.id === id);
+      if (!item) return;
+
+      await kycService.approveKycRequest(item.id, item.userId);
+      await kycService.sendKycStatusEmail({ userId: item.userId, status: 'approved' });
 
       await notificationService.send({
-          userId: id,
+          userId: item.userId,
           template: 'kyc_status',
           data: { status: 'Validé' },
-          channels: ['email', 'push']
+          channels: ['push']
       });
-      
+
+      setKycQueue(prev => prev.filter(q => q.id !== id));
       setSelectedKycItem(null);
       alert(`Dossier approuvé.`);
   };
@@ -338,12 +372,27 @@ export const AdminModeration: React.FC = () => {
                                 <h4 className="font-bold text-gray-800">Pièces Jointes</h4>
                                 <div className="border border-gray-200 rounded-xl p-2">
                                     <p className="text-xs text-gray-400 mb-2 uppercase font-bold px-2">Pièce d'identité (Recto)</p>
-                                    <img src="https://picsum.photos/600/300?random=idcard" className="w-full rounded-lg hover:scale-105 transition-transform cursor-zoom-in" alt="ID Card" />
+                                    {docUrls.idUrl ? (
+                                        <a href={docUrls.idUrl} target="_blank" rel="noreferrer" className="text-sm font-bold text-blue-600 hover:underline px-2 inline-flex items-center gap-1">
+                                            <ExternalLink size={14} /> Ouvrir la pièce d'identité
+                                        </a>
+                                    ) : (
+                                        <p className="text-sm text-gray-400 px-2">{docUrls.loading ? 'Chargement...' : 'Document indisponible'}</p>
+                                    )}
                                 </div>
                                 <div className="border border-gray-200 rounded-xl p-2">
                                     <p className="text-xs text-gray-400 mb-2 uppercase font-bold px-2">Extrait KBIS / Selfie</p>
-                                    <img src="https://picsum.photos/600/300?random=kbis" className="w-full rounded-lg hover:scale-105 transition-transform cursor-zoom-in" alt="KBIS" />
+                                    {docUrls.selfieUrl ? (
+                                        <a href={docUrls.selfieUrl} target="_blank" rel="noreferrer" className="text-sm font-bold text-blue-600 hover:underline px-2 inline-flex items-center gap-1">
+                                            <ExternalLink size={14} /> Ouvrir le selfie
+                                        </a>
+                                    ) : (
+                                        <p className="text-sm text-gray-400 px-2">{docUrls.loading ? 'Chargement...' : 'Document indisponible'}</p>
+                                    )}
                                 </div>
+                                {docUrls.error && (
+                                    <div className="text-xs text-red-600 px-2">{docUrls.error}</div>
+                                )}
                             </div>
                         </div>
                     </div>

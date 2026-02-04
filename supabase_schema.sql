@@ -56,6 +56,10 @@ CREATE POLICY "Users can update their own profile"
 ON public.profiles FOR UPDATE 
 USING (auth.uid() = id);
 
+CREATE POLICY "Admins can update all profiles"
+ON public.profiles FOR UPDATE
+USING (EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'ADMIN'));
+
 -- -----------------------------------------------------------------------------
 -- 2. SERVICE PROVIDERS
 -- -----------------------------------------------------------------------------
@@ -358,3 +362,69 @@ $$ language 'plpgsql';
 CREATE TRIGGER update_profiles_updated_at BEFORE UPDATE ON public.profiles FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
 CREATE TRIGGER update_service_providers_updated_at BEFORE UPDATE ON public.service_providers FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
 CREATE TRIGGER update_events_updated_at BEFORE UPDATE ON public.events FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+
+-- -----------------------------------------------------------------------------
+-- 11. KYC REQUESTS
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.kyc_requests (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+    provider_name TEXT,
+    email TEXT,
+    id_doc_path TEXT,
+    selfie_doc_path TEXT,
+    status TEXT CHECK (status IN ('pending', 'verified', 'rejected')) DEFAULT 'pending',
+    rejection_reason TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    reviewed_at TIMESTAMPTZ,
+    reviewed_by UUID
+);
+
+ALTER TABLE public.kyc_requests ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can create their own kyc request"
+ON public.kyc_requests FOR INSERT
+WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can view their own kyc request"
+ON public.kyc_requests FOR SELECT
+USING (auth.uid() = user_id);
+
+CREATE POLICY "Admins can view all kyc requests"
+ON public.kyc_requests FOR SELECT
+USING (EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'ADMIN'));
+
+CREATE POLICY "Admins can update all kyc requests"
+ON public.kyc_requests FOR UPDATE
+USING (EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'ADMIN'));
+
+-- -----------------------------------------------------------------------------
+-- STORAGE: KYC DOCUMENTS BUCKET & POLICIES
+-- -----------------------------------------------------------------------------
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('kyc-documents', 'kyc-documents', false)
+ON CONFLICT (id) DO NOTHING;
+
+CREATE POLICY "Users can upload own kyc docs"
+ON storage.objects FOR INSERT
+TO authenticated
+WITH CHECK (
+    bucket_id = 'kyc-documents'
+    AND (storage.foldername(name))[1] = auth.uid()::text
+);
+
+CREATE POLICY "Users can read own kyc docs"
+ON storage.objects FOR SELECT
+TO authenticated
+USING (
+    bucket_id = 'kyc-documents'
+    AND (storage.foldername(name))[1] = auth.uid()::text
+);
+
+CREATE POLICY "Admins can read all kyc docs"
+ON storage.objects FOR SELECT
+TO authenticated
+USING (
+    bucket_id = 'kyc-documents'
+    AND EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'ADMIN')
+);

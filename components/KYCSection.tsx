@@ -1,8 +1,9 @@
-
 import React, { useState, useRef } from 'react';
-import { Upload, ShieldAlert, ShieldCheck, Clock, FileText, Camera, Check, AlertCircle, Mail, ArrowRight } from 'lucide-react';
+import { Upload, ShieldAlert, ShieldCheck, Clock, FileText, Camera, Check, AlertCircle } from 'lucide-react';
 import { Button } from './Button';
 import { KYCStatus } from '../types';
+import { useAuth } from '../contexts/AuthContext';
+import { kycService } from '../services/kycService';
 
 interface KYCSectionProps {
   status: KYCStatus;
@@ -10,11 +11,12 @@ interface KYCSectionProps {
 }
 
 export const KYCSection: React.FC<KYCSectionProps> = ({ status, onStatusChange }) => {
-  const [step, setStep] = useState<'upload' | 'email'>('upload');
   const [isLoading, setIsLoading] = useState(false);
   const [idFile, setIdFile] = useState<File | null>(null);
   const [selfieFile, setSelfieFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const { currentUser } = useAuth();
 
   // Refs for hidden file inputs
   const idInputRef = useRef<HTMLInputElement>(null);
@@ -33,39 +35,35 @@ export const KYCSection: React.FC<KYCSectionProps> = ({ status, onStatusChange }
       }
   };
 
-  const handleSubmitDocs = (e: React.FormEvent) => {
+  const handleSubmitDocs = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!idFile || !selfieFile) {
         setError("Veuillez importer les deux documents (Identité et Selfie) pour continuer.");
         return;
     }
+
+    if (!currentUser?.id) {
+        setError("Vous devez être connecté pour soumettre vos documents.");
+        return;
+    }
     
     setIsLoading(true);
-    setTimeout(() => {
-        setIsLoading(false);
-        setStep('email'); // Move to email confirmation step
-    }, 1500);
-  };
-
-  const handleConfirmEmail = () => {
-      setIsLoading(true);
-      setTimeout(() => {
-        setIsLoading(false);
+    setError(null);
+    try {
+        await kycService.submitKycDocuments({
+            userId: currentUser.id,
+            providerName: currentUser.name,
+            email: currentUser.email,
+            idFile,
+            selfieFile
+        });
         onStatusChange('pending');
-        
-        // PUSH TO ADMIN QUEUE (Simulation)
-        const existingQueue = JSON.parse(localStorage.getItem('admin_kyc_queue') || '[]');
-        const newRequest = {
-            id: 'provider-current-session', 
-            providerName: 'Votre Profil (En attente)',
-            email: 'vous@demo.com',
-            submittedAt: new Date().toLocaleString(),
-            docType: 'Identité + Selfie'
-        };
-        
-        const filteredQueue = existingQueue.filter((q:any) => q.id !== newRequest.id);
-        localStorage.setItem('admin_kyc_queue', JSON.stringify([newRequest, ...filteredQueue]));
-      }, 1500);
+    } catch (err: any) {
+        const msg = String(err?.message || err);
+        setError(msg);
+    } finally {
+        setIsLoading(false);
+    }
   };
 
   if (status === 'verified') {
@@ -116,8 +114,7 @@ export const KYCSection: React.FC<KYCSectionProps> = ({ status, onStatusChange }
             Pour être visible sur Événéo et recevoir des paiements, la loi nous impose de vérifier votre identité.
           </p>
 
-          {step === 'upload' ? (
-              <form onSubmit={handleSubmitDocs} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <form onSubmit={handleSubmitDocs} className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* ID UPLOAD */}
                 <div 
                     onClick={() => triggerFileInput(idInputRef)}
@@ -195,36 +192,10 @@ export const KYCSection: React.FC<KYCSectionProps> = ({ status, onStatusChange }
                     className={(!idFile || !selfieFile) ? "opacity-75" : ""}
                   >
                     <Upload size={18} className="mr-2" />
-                    {isLoading ? 'Traitement en cours...' : 'Suivant : Confirmation Email'}
+                    {isLoading ? 'Envoi en cours...' : 'Envoyer les documents'}
                   </Button>
                 </div>
               </form>
-          ) : (
-              <div className="animate-in slide-in-from-right text-center py-6">
-                  <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4 text-blue-600 animate-pulse">
-                      <Mail size={32} />
-                  </div>
-                  <h4 className="text-lg font-bold text-gray-900 mb-2">Vérifiez votre boîte mail</h4>
-                  <p className="text-gray-500 max-w-md mx-auto mb-8">
-                      Un email de confirmation vient d'être envoyé à <strong>vous@demo.com</strong>. Veuillez cliquer sur le lien à l'intérieur pour finaliser votre vérification.
-                  </p>
-                  
-                  <div className="max-w-xs mx-auto space-y-3">
-                       <div className="bg-gray-50 border border-gray-200 p-4 rounded-xl">
-                           <p className="text-xs font-bold text-gray-400 uppercase mb-2">Simulation du lien email</p>
-                           <Button variant="primary" fullWidth onClick={handleConfirmEmail} disabled={isLoading}>
-                               {isLoading ? 'Validation...' : 'Simuler le clic sur le lien'}
-                           </Button>
-                       </div>
-                       <button 
-                         className="text-sm text-gray-400 hover:text-gray-600 underline"
-                         onClick={() => setStep('upload')}
-                       >
-                           Retour à l'upload
-                       </button>
-                  </div>
-              </div>
-          )}
         </div>
       </div>
     </div>
