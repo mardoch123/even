@@ -8,6 +8,8 @@ import { useConnectivity } from '../contexts/ConnectivityContext';
 import { UserRole } from '../types';
 import { moderationService } from '../services/moderationService';
 import { chatSafetyService, NEUTRAL_MASK_MESSAGE } from '../services/chatSafetyService';
+import { messageService, ChatMessage } from '../services/messageService';
+import { supabase, supabaseConfigError } from '../services/supabaseClient';
 
 type Conversation = {
   id: string;
@@ -41,45 +43,100 @@ interface Msg {
     }
 }
 
-type StoredChatState = {
-  conversations: Conversation[];
-  messagesByConversationId: Record<string, Msg[]>;
+type OutboxItem = {
+  id: string;
+  receiverId: string;
+  content: string;
+  attachmentData?: any;
+  offerDetails?: any;
+  createdAt: number;
 };
 
-const getStorageKey = (userId: string) => `eveneo_messages_v1:${userId}`;
+const outboxKey = (userId: string) => `eveneo_chat_outbox_v1:${userId}`;
 
-const buildDefaultState = (): StoredChatState => {
-  const c1: Conversation = { id: 'c-1', name: 'Saveurs Exquises', role: 'Traiteur', lastMsg: 'Bonjour !', time: '10:00', avatar: 'https://picsum.photos/50/50?random=1', unread: 0, online: true };
-  const c2: Conversation = { id: 'c-2', name: 'DJ Snake Event', role: 'DJ', lastMsg: 'Salut !', time: '09:00', avatar: 'https://picsum.photos/50/50?random=2', unread: 0, online: false };
-  return {
-    conversations: [c1, c2],
-    messagesByConversationId: {
-      [c1.id]: [{ id: 'm-101', sender: 'them', type: 'text', text: 'Bonjour, nous sommes ravis de discuter de votre menu !', time: '10:00' }],
-      [c2.id]: [{ id: 'm-201', sender: 'them', type: 'text', text: 'Salut, quel style de musique préférez-vous ?', time: '09:00' }]
-    }
-  };
-};
-
-const readState = (userId: string): StoredChatState => {
+const readOutbox = (userId: string): OutboxItem[] => {
   try {
-    const raw = localStorage.getItem(getStorageKey(userId));
-    if (!raw) return buildDefaultState();
-    const parsed = JSON.parse(raw) as StoredChatState;
-    if (!parsed || !Array.isArray(parsed.conversations) || typeof parsed.messagesByConversationId !== 'object') {
-      return buildDefaultState();
-    }
-    return parsed;
+    const raw = localStorage.getItem(outboxKey(userId));
+    const parsed = raw ? (JSON.parse(raw) as any[]) : [];
+    return Array.isArray(parsed) ? (parsed as OutboxItem[]) : [];
   } catch {
-    return buildDefaultState();
+    return [];
   }
 };
 
-const writeState = (userId: string, state: StoredChatState) => {
+const writeOutbox = (userId: string, items: OutboxItem[]) => {
   try {
-    localStorage.setItem(getStorageKey(userId), JSON.stringify(state));
+    localStorage.setItem(outboxKey(userId), JSON.stringify(items));
   } catch {
     // ignore
   }
+};
+
+const toTime = (iso: string) => {
+  try {
+    return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return '';
+  }
+};
+
+const toConversation = (userId: string, partner: any, last: ChatMessage, unreadCount: number): Conversation => {
+  const name = partner?.full_name || partner?.name || 'Utilisateur';
+  const role = partner?.role || 'Utilisateur';
+  const avatar = partner?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=E5E7EB&color=111827&rounded=true`;
+  const lastMsg = last?.content || '';
+  return {
+    id: String(partner?.id || ''),
+    name,
+    role,
+    lastMsg,
+    time: last?.created_at ? toTime(last.created_at) : '',
+    avatar,
+    unread: unreadCount || 0,
+    online: true
+  };
+};
+
+const toMsg = (userId: string, m: ChatMessage): Msg => {
+  const sender = m.sender_id === userId ? 'me' : 'them';
+  const offer = (m as any).offer_details;
+  const attachment = (m as any).attachment_data;
+
+  if (attachment && typeof attachment === 'object' && attachment.dataUrl) {
+    return {
+      id: m.id,
+      sender,
+      type: 'file',
+      fileUrl: attachment.dataUrl,
+      time: toTime(m.created_at),
+    };
+  }
+
+  if (offer && typeof offer === 'object') {
+    return {
+      id: m.id,
+      sender,
+      type: 'offer',
+      text: m.content,
+      time: toTime(m.created_at),
+      offerDetails: {
+        title: offer.title || 'Offre',
+        price: offer.price || '',
+        description: offer.description || '',
+        status: offer.status === 'accepted' ? 'accepted' : 'pending'
+      }
+    };
+  }
+
+  const text = m.content || '';
+  const isLink = text.startsWith('http');
+  return {
+    id: m.id,
+    sender,
+    type: isLink ? 'link' : 'text',
+    text,
+    time: toTime(m.created_at)
+  };
 };
 
 export const MessagesPage: React.FC = () => {
@@ -90,12 +147,9 @@ export const MessagesPage: React.FC = () => {
   const providerId = searchParams.get('provider');
   
   const userId = currentUser?.id || 'guest';
-  const [conversations, setConversations] = useState<Conversation[]>(() => readState(userId).conversations);
-  const [allMessages, setAllMessages] = useState<Record<string, Msg[]>>(() => readState(userId).messagesByConversationId);
-  const [activeChat, setActiveChat] = useState<string>(() => {
-    const initial = readState(userId);
-    return initial.conversations[0]?.id || 'c-1';
-  });
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [allMessages, setAllMessages] = useState<Record<string, Msg[]>>({});
+  const [activeChat, setActiveChat] = useState<string>('');
   const [mobileView, setMobileView] = useState<'list' | 'chat'>('list');
 
   const [input, setInput] = useState('');
@@ -113,38 +167,185 @@ export const MessagesPage: React.FC = () => {
   const messages = allMessages[activeChat] || [];
 
   useEffect(() => {
-    // Reload from storage when user changes
-    const state = readState(userId);
-    setConversations(state.conversations);
-    setAllMessages(state.messagesByConversationId);
-    setActiveChat(state.conversations[0]?.id || 'c-1');
+    if (!currentUser || supabaseConfigError) {
+      return;
+    }
+
+    let isCancelled = false;
+
+    const load = async () => {
+      const previews = await messageService.listConversations(userId);
+      const partnerIds = previews.map(p => p.partnerId).filter(Boolean);
+      const partnersById = new Map<string, any>();
+
+      if (partnerIds.length > 0) {
+        const { data } = await supabase
+          .from('profiles')
+          .select('id,full_name,avatar_url,role')
+          .in('id', partnerIds);
+        (data || []).forEach((p: any) => partnersById.set(String(p.id), p));
+      }
+
+      const nextConvs = previews
+        .map(p => {
+          const partner = partnersById.get(p.partnerId) || { id: p.partnerId };
+          return toConversation(userId, partner, p.lastMessage, p.unreadCount);
+        })
+        .filter(c => c.id);
+
+      if (isCancelled) return;
+      setConversations(nextConvs);
+      setActiveChat(prev => prev || nextConvs[0]?.id || '');
+    };
+
+    load();
+
+    return () => {
+      isCancelled = true;
+    };
   }, [userId]);
 
   useEffect(() => {
-    // If /messages?provider=<id> is used, open or create a dedicated conversation for that provider
-    if (!providerId) return;
-    const targetConvId = `p:${providerId}`;
-    const exists = conversations.some(c => c.id === targetConvId);
-    if (!exists) {
-      const newConv: Conversation = {
-        id: targetConvId,
-        name: `Prestataire ${providerId}`,
-        role: 'Prestataire',
-        lastMsg: '',
-        time: '',
-        avatar: `https://picsum.photos/50/50?random=${encodeURIComponent(providerId)}`,
-        unread: 0,
-        online: true
-      };
-      const nextConvs = [newConv, ...conversations];
-      const nextAll = { ...allMessages, [newConv.id]: [] };
-      setConversations(nextConvs);
-      setAllMessages(nextAll);
-      writeState(userId, { conversations: nextConvs, messagesByConversationId: nextAll });
-    }
-    setActiveChat(targetConvId);
-    setMobileView('chat');
-  }, [providerId, conversations, allMessages, userId]);
+    if (!providerId || !currentUser || supabaseConfigError) return;
+
+    let isCancelled = false;
+
+    const resolvePartnerId = async () => {
+      const asUuid = String(providerId);
+      try {
+        const { data } = await supabase
+          .from('service_providers')
+          .select('owner_id,name,category')
+          .eq('id', asUuid)
+          .maybeSingle();
+
+        const partnerUserId = (data as any)?.owner_id || asUuid;
+        if (isCancelled) return;
+        setActiveChat(partnerUserId);
+        setMobileView('chat');
+
+        if (!conversations.some(c => c.id === partnerUserId)) {
+          const name = (data as any)?.name ? String((data as any).name) : `Utilisateur ${partnerUserId.slice(0, 6)}`;
+          const role = (data as any)?.category ? String((data as any).category) : 'Prestataire';
+          const newConv: Conversation = {
+            id: partnerUserId,
+            name,
+            role,
+            lastMsg: '',
+            time: '',
+            avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=E5E7EB&color=111827&rounded=true`,
+            unread: 0,
+            online: true
+          };
+          setConversations(prev => [newConv, ...prev]);
+        }
+      } catch {
+        if (isCancelled) return;
+        setActiveChat(asUuid);
+        setMobileView('chat');
+      }
+    };
+
+    resolvePartnerId();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [providerId, userId]);
+
+  useEffect(() => {
+    if (!activeChat || !currentUser || supabaseConfigError) return;
+
+    let isCancelled = false;
+
+    const loadThread = async () => {
+      const data = await messageService.getConversationMessages(userId, activeChat);
+      if (isCancelled) return;
+      const mapped = data.map(m => toMsg(userId, m));
+      setAllMessages(prev => ({ ...prev, [activeChat]: mapped }));
+      await messageService.markConversationRead(userId, activeChat);
+      setConversations(prev => prev.map(c => c.id === activeChat ? { ...c, unread: 0 } : c));
+    };
+
+    loadThread();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [activeChat, userId]);
+
+  useEffect(() => {
+    if (!currentUser || supabaseConfigError) return;
+    const sub = messageService.subscribeToMessages(userId, (msg) => {
+      const partnerId = msg.sender_id === userId ? msg.receiver_id : msg.sender_id;
+      setAllMessages(prev => {
+        const next = { ...prev };
+        const arr = next[partnerId] ? [...next[partnerId]] : [];
+        const exists = arr.some(m => m.id === msg.id);
+        if (!exists) {
+          arr.push(toMsg(userId, msg));
+          next[partnerId] = arr;
+        }
+        return next;
+      });
+      setConversations(prev => {
+        const idx = prev.findIndex(c => c.id === partnerId);
+        const preview = {
+          lastMsg: msg.content || '',
+          time: toTime(msg.created_at)
+        };
+        if (idx < 0) {
+          const name = `Utilisateur ${partnerId.slice(0, 6)}`;
+          const newConv: Conversation = {
+            id: partnerId,
+            name,
+            role: 'Utilisateur',
+            lastMsg: preview.lastMsg,
+            time: preview.time,
+            avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=E5E7EB&color=111827&rounded=true`,
+            unread: msg.receiver_id === userId ? 1 : 0,
+            online: true
+          };
+          return [newConv, ...prev];
+        }
+        return prev.map((c, i) => {
+          if (i !== idx) return c;
+          const unread = msg.receiver_id === userId && partnerId !== activeChat ? (c.unread + 1) : c.unread;
+          return { ...c, ...preview, unread };
+        });
+      });
+    });
+    return () => {
+      sub.unsubscribe();
+    };
+  }, [userId, activeChat]);
+
+  useEffect(() => {
+    if (!isOnline || !currentUser || supabaseConfigError) return;
+    const items = readOutbox(userId);
+    if (items.length === 0) return;
+
+    let cancelled = false;
+    const flush = async () => {
+      const remaining: OutboxItem[] = [];
+      for (const it of items) {
+        if (cancelled) return;
+        const sent = await messageService.sendMessage({
+          senderId: userId,
+          receiverId: it.receiverId,
+          content: it.content,
+          attachmentData: it.attachmentData,
+          offerDetails: it.offerDetails,
+        });
+        if (!sent) remaining.push(it);
+      }
+      writeOutbox(userId, remaining);
+    };
+    flush();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOnline, userId]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -161,6 +362,7 @@ export const MessagesPage: React.FC = () => {
 
   const handleSend = async (type: 'text' | 'offer' = 'text', content?: any, textOverride?: string) => {
     const rawText = (textOverride ?? input) || '';
+    if (!activeChat) return;
 
     if (type === 'text') {
         if (!rawText.trim()) return;
@@ -180,34 +382,39 @@ export const MessagesPage: React.FC = () => {
         const safe = decision.action === 'allow' ? rawText : decision.safeText;
         const isLink = safe.startsWith('http');
 
-        const newMsg: Msg = {
-            id: `m-${Date.now()}`,
-            sender: 'me',
-            type: isLink ? 'link' : type,
-            text: safe,
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            isPending: !isOnline,
-            offerDetails: undefined,
-            linkData: isLink ? { url: safe, title: 'Aperçu du lien...', image: 'https://picsum.photos/200/100' } : undefined
+        const tempId = `tmp-${Date.now()}`;
+        const optimistic: Msg = {
+          id: tempId,
+          sender: 'me',
+          type: isLink ? 'link' : 'text',
+          text: safe,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          isPending: !isOnline
         };
 
-        const payload = { chatId: activeChat, message: newMsg };
-
-        queueAction('SEND_MESSAGE', payload, () => {
-            setAllMessages(prev => {
-                const next = {
-                    ...prev,
-                    [activeChat]: [...(prev[activeChat] || []), newMsg]
-                };
-                const nowStr = newMsg.time;
-                setConversations(prevConvs => {
-                    const nextConvs = prevConvs.map(c => c.id === activeChat ? { ...c, lastMsg: safe, time: nowStr, unread: 0 } : c);
-                    writeState(userId, { conversations: nextConvs, messagesByConversationId: next });
-                    return nextConvs;
-                });
-                return next;
-            });
+        queueAction('SEND_MESSAGE', { receiverId: activeChat, content: safe }, () => {
+          setAllMessages(prev => ({
+            ...prev,
+            [activeChat]: [...(prev[activeChat] || []), optimistic]
+          }));
+          setConversations(prev => prev.map(c => c.id === activeChat ? { ...c, lastMsg: safe, time: optimistic.time } : c));
         });
+
+        if (isOnline && !supabaseConfigError && currentUser) {
+          const sent = await messageService.sendMessage({ senderId: userId, receiverId: activeChat, content: safe });
+          if (sent) {
+            setAllMessages(prev => ({
+              ...prev,
+              [activeChat]: (prev[activeChat] || []).filter(m => m.id !== tempId)
+            }));
+          } else {
+            const items = readOutbox(userId);
+            writeOutbox(userId, [{ id: tempId, receiverId: activeChat, content: safe, createdAt: Date.now() }, ...items]);
+          }
+        } else {
+          const items = readOutbox(userId);
+          writeOutbox(userId, [{ id: tempId, receiverId: activeChat, content: safe, createdAt: Date.now() }, ...items]);
+        }
 
         setInput('');
         return;
@@ -215,34 +422,45 @@ export const MessagesPage: React.FC = () => {
 
     const isLink = rawText.startsWith('http');
 
-    const newMsg: Msg = {
-        id: `m-${Date.now()}`,
-        sender: 'me',
-        type: isLink ? 'link' : type,
-        text: rawText,
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        isPending: !isOnline,
-        offerDetails: type === 'offer' ? content : undefined,
-        linkData: isLink ? { url: rawText, title: 'Aperçu du lien...', image: 'https://picsum.photos/200/100' } : undefined
+    const tempId = `tmp-${Date.now()}`;
+    const optimistic: Msg = {
+      id: tempId,
+      sender: 'me',
+      type: 'offer',
+      text: rawText,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      isPending: !isOnline,
+      offerDetails: content
     };
 
-    const payload = { chatId: activeChat, message: newMsg };
-
-    queueAction('SEND_MESSAGE', payload, () => {
-        setAllMessages(prev => {
-            const next = {
-                ...prev,
-                [activeChat]: [...(prev[activeChat] || []), newMsg]
-            };
-            const nowStr = newMsg.time;
-            setConversations(prevConvs => {
-                const nextConvs = prevConvs.map(c => c.id === activeChat ? { ...c, lastMsg: rawText, time: nowStr, unread: 0 } : c);
-                writeState(userId, { conversations: nextConvs, messagesByConversationId: next });
-                return nextConvs;
-            });
-            return next;
-        });
+    queueAction('SEND_MESSAGE', { receiverId: activeChat, content: rawText, offerDetails: content }, () => {
+      setAllMessages(prev => ({
+        ...prev,
+        [activeChat]: [...(prev[activeChat] || []), optimistic]
+      }));
+      setConversations(prev => prev.map(c => c.id === activeChat ? { ...c, lastMsg: 'Offre', time: optimistic.time } : c));
     });
+
+    if (isOnline && !supabaseConfigError && currentUser) {
+      const sent = await messageService.sendMessage({
+        senderId: userId,
+        receiverId: activeChat,
+        content: rawText,
+        offerDetails: content
+      });
+      if (sent) {
+        setAllMessages(prev => ({
+          ...prev,
+          [activeChat]: (prev[activeChat] || []).filter(m => m.id !== tempId)
+        }));
+      } else {
+        const items = readOutbox(userId);
+        writeOutbox(userId, [{ id: tempId, receiverId: activeChat, content: rawText, offerDetails: content, createdAt: Date.now() }, ...items]);
+      }
+    } else {
+      const items = readOutbox(userId);
+      writeOutbox(userId, [{ id: tempId, receiverId: activeChat, content: rawText, offerDetails: content, createdAt: Date.now() }, ...items]);
+    }
 
     setInput('');
   };
@@ -264,7 +482,7 @@ export const MessagesPage: React.FC = () => {
           }
 
           const newMsg: Msg = {
-              id: `m-${Date.now()}`,
+              id: `tmp-${Date.now()}`,
               sender: 'me',
               type: 'file',
               fileUrl: dataUrl,
@@ -272,21 +490,34 @@ export const MessagesPage: React.FC = () => {
               isPending: !isOnline
           };
 
-          const payload = { chatId: activeChat, message: newMsg };
-          queueAction('SEND_MESSAGE', payload, () => {
-              setAllMessages(prev => {
-                  const next = {
-                      ...prev,
-                      [activeChat]: [...(prev[activeChat] || []), newMsg]
-                  };
-                  setConversations(prevConvs => {
-                      const nextConvs = prevConvs.map(c => c.id === activeChat ? { ...c, lastMsg: '📎 Pièce jointe', time: newMsg.time, unread: 0 } : c);
-                      writeState(userId, { conversations: nextConvs, messagesByConversationId: next });
-                      return nextConvs;
-                  });
-                  return next;
-              });
+          queueAction('SEND_MESSAGE', { receiverId: activeChat, content: 'Pièce jointe', attachmentData: { dataUrl } }, () => {
+            setAllMessages(prev => ({
+              ...prev,
+              [activeChat]: [...(prev[activeChat] || []), newMsg]
+            }));
+            setConversations(prev => prev.map(c => c.id === activeChat ? { ...c, lastMsg: '📎 Pièce jointe', time: newMsg.time } : c));
           });
+
+          if (isOnline && !supabaseConfigError && currentUser) {
+            const sent = await messageService.sendMessage({
+              senderId: userId,
+              receiverId: activeChat,
+              content: 'Pièce jointe',
+              attachmentData: { dataUrl }
+            });
+            if (sent) {
+              setAllMessages(prev => ({
+                ...prev,
+                [activeChat]: (prev[activeChat] || []).filter(m => m.id !== newMsg.id)
+              }));
+            } else {
+              const items = readOutbox(userId);
+              writeOutbox(userId, [{ id: newMsg.id, receiverId: activeChat, content: 'Pièce jointe', attachmentData: { dataUrl }, createdAt: Date.now() }, ...items]);
+            }
+          } else {
+            const items = readOutbox(userId);
+            writeOutbox(userId, [{ id: newMsg.id, receiverId: activeChat, content: 'Pièce jointe', attachmentData: { dataUrl }, createdAt: Date.now() }, ...items]);
+          }
       };
       reader.readAsDataURL(file);
   };
@@ -359,9 +590,7 @@ export const MessagesPage: React.FC = () => {
       setAllMessages(prev => {
           const next = { ...prev, [activeChat]: [...(prev[activeChat] || []), newMsg] };
           setConversations(prevConvs => {
-              const nextConvs = prevConvs.map(c => c.id === activeChat ? { ...c, lastMsg: '📞 Appel', time: newMsg.time, unread: 0 } : c);
-              writeState(userId, { conversations: nextConvs, messagesByConversationId: next });
-              return nextConvs;
+              return prevConvs.map(c => c.id === activeChat ? { ...c, lastMsg: '📞 Appel', time: newMsg.time, unread: 0 } : c);
           });
           return next;
       });
