@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#8A2DF9" />
+    <meta name="description" content="Événéo - La plateforme tout-en-un pour organiser vos événements." />
+    <link rel="manifest" href="./manifest.json" />
+    <link rel="apple-touch-icon" href="https://ui-avatars.com/api/?name=E&background=8A2DF9&color=fff&size=192&rounded=true&bold=true" />
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Événéo">
+    
+    <title>Événéo - Organisez votre événement</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+            },
+            colors: {
+              eveneo: {
+                blue: '#2D7FF9',
+                violet: '#8A2DF9',
+                pink: '#F92DBE',
+                orange: '#FF7A1A',
+                dark: '#1F1F1F',
+                light: '#F5F5F7',
+              }
+            },
+            backgroundImage: {
+              'eveneo-gradient': 'linear-gradient(90deg, #2D7FF9 0%, #8A2DF9 25%, #F92DBE 60%, #FF7A1A 100%)',
+              'eveneo-gradient-hover': 'linear-gradient(90deg, #2D7FF9 10%, #8A2DF9 35%, #F92DBE 70%, #FF7A1A 100%)',
+            },
+            boxShadow: {
+              'glow': '0 0 20px rgba(138, 45, 249, 0.3)',
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      body {
+        background-color: #F5F5F7;
+        color: #1F1F1F;
+        overscroll-behavior-y: none; /* Prevent pull-to-refresh on mobile PWA */
+      }
+      /* Custom scrollbar for webkit */
+      ::-webkit-scrollbar {
+        width: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #f1f1f1; 
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #8A2DF9; 
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #2D7FF9; 
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react-router-dom": "https://aistudiocdn.com/react-router-dom@^7.9.6",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.554.0",
+    "@supabase/supabase-js": "https://aistudiocdn.com/@supabase/supabase-js@^2.84.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>
