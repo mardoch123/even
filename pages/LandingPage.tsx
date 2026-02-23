@@ -149,16 +149,6 @@ export const LandingPage: React.FC = () => {
               </div>
             </div>
           </div>
-
-          {/* Partners/Trust */}
-          <div className="mt-16 pt-8 border-t border-gray-100">
-            <p className="text-center text-sm text-gray-400 mb-6 uppercase tracking-widest font-semibold">{t('hero.trust_text')}</p>
-            <div className="flex flex-wrap justify-center gap-8 md:gap-16 opacity-50 grayscale hover:grayscale-0 transition-all duration-500">
-              {['Vogue Events', 'TechCrunch Party', 'Wedding Planner Co', 'Corporate Elite', 'FestivAll'].map(logo => (
-                <span key={logo} className="text-xl font-bold font-serif">{logo}</span>
-              ))}
-            </div>
-          </div>
         </div>
       </section>
 
