@@ -114,7 +114,7 @@ export const MobileProviderProfileSettingsPage: React.FC = () => {
       icon: Shield,
       label: 'Vérification KYC',
       value: currentUser?.kycStatus === 'verified' ? 'Vérifié' : 'En attente',
-      path: '/kyc',
+      path: '/provider/kyc',
       color: currentUser?.kycStatus === 'verified' ? 'text-green-600' : 'text-orange-600',
       bgColor: currentUser?.kycStatus === 'verified' ? 'bg-green-100' : 'bg-orange-100'
     },

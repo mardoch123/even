@@ -44,12 +44,26 @@ export const LoginPage: React.FC = () => {
 
   useEffect(() => {
     if (currentUser) {
-      navigate('/', { replace: true });
+      // Rediriger vers le dashboard correspondant au rôle
+      if (currentUser.role === 'admin') {
+        navigate('/admin/dashboard', { replace: true });
+      } else if (currentUser.role === 'provider') {
+        navigate('/dashboard/provider', { replace: true });
+      } else {
+        navigate('/dashboard/client', { replace: true });
+      }
     }
   }, [currentUser, navigate]);
 
   const handlePostLoginRedirect = () => {
-       navigate('/', { replace: true });
+    // Rediriger vers le dashboard correspondant au rôle
+    if (currentUser?.role === 'admin') {
+      navigate('/admin/dashboard', { replace: true });
+    } else if (currentUser?.role === 'provider') {
+      navigate('/dashboard/provider', { replace: true });
+    } else {
+      navigate('/dashboard/client', { replace: true });
+    }
   };
 
   const handleLogin = async (e: React.FormEvent) => {

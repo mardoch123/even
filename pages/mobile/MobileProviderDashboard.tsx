@@ -23,6 +23,7 @@ import {
   Camera,
   CreditCard
 } from 'lucide-react';
+import { MobileBottomNav } from '../../components/mobile/MobileBottomNav';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCurrency } from '../../contexts/CurrencyContext';
 import { eventService } from '../../services/eventService';
@@ -227,12 +228,7 @@ export const MobileProviderDashboard: React.FC = () => {
     }
   ];
 
-  const bottomNavItems = [
-    { id: 'overview', icon: BarChart3, label: 'Accueil', badge: 0 },
-    { id: 'calendar', icon: Calendar, label: 'Agenda', badge: 5 },
-    { id: 'messages', icon: MessageSquare, label: 'Messages', badge: 2 },
-    { id: 'stats', icon: DollarSign, label: 'Revenus', badge: 0 }
-  ];
+  // Utiliser MobileBottomNav standard comme dans le profil
 
   if (loading) {
     return (
@@ -293,7 +289,7 @@ export const MobileProviderDashboard: React.FC = () => {
                   Complétez votre vérification pour recevoir des demandes et être visible par les clients.
                 </p>
                 <button 
-                  onClick={() => navigate('/kyc')}
+                  onClick={() => navigate('/provider/kyc')}
                   className="bg-white text-orange-600 font-semibold px-4 py-2 rounded-xl text-sm active:scale-95 transition-transform"
                 >
                   Commencer la vérification
@@ -443,32 +439,8 @@ export const MobileProviderDashboard: React.FC = () => {
         </section>
       </main>
 
-      {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 safe-area-bottom z-40">
-        <div className="flex items-center justify-around py-2">
-          {bottomNavItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setActiveTab(item.id as any)}
-              className={`flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-colors ${
-                activeTab === item.id 
-                  ? 'text-eveneo-blue' 
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              <div className="relative">
-                <item.icon size={22} />
-                {item.badge > 0 && (
-                  <span className="absolute -top-2 -right-2 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-                    {item.badge}
-                  </span>
-                )}
-              </div>
-              <span className="text-xs font-medium">{item.label}</span>
-            </button>
-          ))}
-        </div>
-      </nav>
+      {/* Bottom Navigation - Utilise le même composant que le profil */}
+      <MobileBottomNav />
     </div>
   );
 };

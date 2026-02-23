@@ -2,6 +2,7 @@ import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Home, Search, Calendar, MessageSquare, User } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { UserRole } from '../../types';
 
 interface NavItem {
   icon: React.ElementType;
@@ -9,7 +10,8 @@ interface NavItem {
   path: string;
 }
 
-const navItems: NavItem[] = [
+// Navigation pour les clients
+const clientNavItems: NavItem[] = [
   { icon: Home, label: 'Accueil', path: '/dashboard/client' },
   { icon: Search, label: 'Recherche', path: '/search' },
   { icon: Calendar, label: 'Réservations', path: '/orders' },
@@ -17,13 +19,26 @@ const navItems: NavItem[] = [
   { icon: User, label: 'Profil', path: '/profile' },
 ];
 
+// Navigation pour les prestataires
+const providerNavItems: NavItem[] = [
+  { icon: Home, label: 'Accueil', path: '/dashboard/provider' },
+  { icon: Calendar, label: 'Demandes', path: '/provider/requests' },
+  { icon: MessageSquare, label: 'Messages', path: '/provider/messages' },
+  { icon: User, label: 'Profil', path: '/provider/profile' },
+];
+
 export const MobileBottomNav: React.FC = () => {
   const location = useLocation();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, currentUser } = useAuth();
   const currentPath = location.pathname;
 
-  // Masquer le bottom nav quand l'utilisateur est connecté
-  if (isAuthenticated) {
+  // Déterminer quelle navigation afficher selon le rôle
+  const isProvider = currentUser?.role === UserRole.PROVIDER;
+  const navItems = isProvider ? providerNavItems : clientNavItems;
+
+  // Masquer le bottom nav sur certaines pages (login, register, onboarding)
+  const hiddenPaths = ['/login', '/register', '/onboarding'];
+  if (hiddenPaths.some(path => currentPath.startsWith(path))) {
     return null;
   }
 

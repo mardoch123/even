@@ -608,7 +608,7 @@ export const MobileClientProfilePage: React.FC = () => {
         <h3 className="font-semibold text-gray-900 mb-4">Sécurité</h3>
         
         <button 
-          onClick={() => navigate('/kyc')}
+          onClick={() => navigate('/provider/kyc')}
           className="w-full flex items-center justify-between py-2"
         >
           <div className="flex items-center gap-3">
@@ -879,13 +879,34 @@ export const MobileClientProfilePage: React.FC = () => {
     <div className="px-4 py-4 space-y-4">
       <section className="bg-white rounded-2xl shadow-sm overflow-hidden">
         {[
-          { icon: HelpCircle, label: 'FAQ', desc: 'Questions fréquentes' },
-          { icon: MessageSquare, label: 'Contactez-nous', desc: 'Support client' },
-          { icon: Shield, label: 'Confidentialité', desc: 'Politique de confidentialité' },
-          { icon: FileText, label: 'Conditions', desc: 'Conditions d\'utilisation' }
+          { 
+            icon: HelpCircle, 
+            label: 'FAQ', 
+            desc: 'Questions fréquentes',
+            action: () => isProvider ? navigate('/provider/faq') : navigate('/page/help')
+          },
+          { 
+            icon: MessageSquare, 
+            label: 'Contactez-nous', 
+            desc: 'Support client',
+            action: () => window.location.href = 'mailto:support@eveneo.ca'
+          },
+          { 
+            icon: Shield, 
+            label: 'Confidentialité', 
+            desc: 'Politique de confidentialité',
+            action: () => navigate('/page/privacy')
+          },
+          { 
+            icon: FileText, 
+            label: 'Conditions', 
+            desc: 'Conditions d\'utilisation',
+            action: () => navigate('/page/terms')
+          }
         ].map((item, index, arr) => (
           <button
             key={index}
+            onClick={item.action}
             className={`w-full flex items-center gap-4 p-4 hover:bg-gray-50 transition-colors ${
               index !== arr.length - 1 ? 'border-b border-gray-100' : ''
             }`}

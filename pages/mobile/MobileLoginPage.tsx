@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Mail, Lock, AlertCircle } from 'lucide-react';
+import { Mail, Lock, AlertCircle, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Logo } from '../../components/Logo';
 import { UserRole } from '../../types';
@@ -28,7 +28,14 @@ export const MobileLoginPage: React.FC = () => {
 
   useEffect(() => {
     if (currentUser) {
-      navigate('/', { replace: true });
+      // Rediriger vers le dashboard correspondant au rôle
+      if (currentUser.role === 'admin') {
+        navigate('/admin/dashboard', { replace: true });
+      } else if (currentUser.role === 'provider') {
+        navigate('/dashboard/provider', { replace: true });
+      } else {
+        navigate('/dashboard/client', { replace: true });
+      }
     }
   }, [currentUser, navigate]);
 
@@ -39,7 +46,7 @@ export const MobileLoginPage: React.FC = () => {
     
     try {
       await login(identifier, password);
-      navigate('/', { replace: true });
+      // La redirection sera gérée par le useEffect ci-dessus
     } catch (err: any) {
       console.error(err);
       setError(String(err?.message || err || 'Connexion impossible.'));
@@ -66,8 +73,18 @@ export const MobileLoginPage: React.FC = () => {
       {/* Overlay de chargement */}
       {isLoading && <MobileOverlayLoader message="Connexion en cours..." />}
 
-      {/* Header avec Logo */}
+      {/* Header avec bouton retour et Logo */}
       <div className="flex-1 flex flex-col px-6 pt-12 pb-8">
+        {/* Bouton retour */}
+        <div className="mb-4">
+          <button 
+            onClick={() => navigate('/')}
+            className="p-2 -ml-2 hover:bg-gray-100 rounded-full transition-colors"
+          >
+            <ArrowLeft size={24} className="text-gray-700" />
+          </button>
+        </div>
+
         {/* Logo et tagline */}
         <div className="text-center mb-10">
           <div className="flex justify-center mb-4">

@@ -311,7 +311,7 @@ export const MobileProviderAvailabilityPage: React.FC = () => {
                 </div>
 
                 {slot.isAvailable && (
-                  <div className="flex items-center gap-3 pl-13">
+                  <div className="flex items-center gap-3 pl-12">
                     <div className="flex-1">
                       <label className="text-xs text-gray-500 block mb-1">Début</label>
                       <input

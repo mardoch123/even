@@ -35,9 +35,10 @@ export const Footer: React.FC = () => {
             <ul className="space-y-3 text-gray-400 text-sm">
               <li><Link to="/how-it-works" className="hover:text-white transition-colors">{t('footer.links.how')}</Link></li>
               <li><Link to="/search" className="hover:text-white transition-colors">{t('footer.links.services')}</Link></li>
-              {currentUser?.role !== 'client' && (
+              {/* Masquer Tarif pour tout le monde */}
+              {/* {currentUser?.role !== 'client' && (
                 <li><Link to="/pricing" className="hover:text-white transition-colors">{t('footer.links.pricing')}</Link></li>
-              )}
+              )} */}
               <li><Link to="/testimonials" className="hover:text-white transition-colors">{t('footer.links.testimonials')}</Link></li>
             </ul>
           </div>
