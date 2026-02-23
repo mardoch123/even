@@ -19,7 +19,7 @@ import { MobileBottomNav } from '../../components/mobile/MobileBottomNav';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCurrency } from '../../contexts/CurrencyContext';
 import { providerService } from '../../services/providerService';
-import { ServiceProvider } from '../../types';
+import { ServiceProvider, UserRole } from '../../types';
 import { reviewService, Review } from '../../services/reviewService';
 
 export const MobileProviderProfilePage: React.FC = () => {
@@ -57,6 +57,10 @@ export const MobileProviderProfilePage: React.FC = () => {
   }, [id]);
 
   const handleBook = () => {
+    // Les prestataires ne peuvent pas réserver
+    if (currentUser?.role === UserRole.PROVIDER) {
+      return;
+    }
     if (!currentUser) {
       navigate('/login');
       return;
@@ -310,12 +314,15 @@ export const MobileProviderProfilePage: React.FC = () => {
             >
               <MessageCircle size={20} />
             </button>
-            <button
-              onClick={handleBook}
-              className="px-6 py-3 bg-gradient-to-r from-eveneo-violet to-eveneo-pink text-white font-semibold rounded-xl active:scale-95 transition-transform"
-            >
-              Réserver
-            </button>
+            {/* Masquer le bouton Réserver pour les prestataires */}
+            {currentUser?.role !== UserRole.PROVIDER && (
+              <button
+                onClick={handleBook}
+                className="px-6 py-3 bg-gradient-to-r from-eveneo-violet to-eveneo-pink text-white font-semibold rounded-xl active:scale-95 transition-transform"
+              >
+                Réserver
+              </button>
+            )}
           </div>
         </div>
       </div>

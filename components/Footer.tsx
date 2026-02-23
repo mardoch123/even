@@ -3,10 +3,12 @@ import React from 'react';
 import { Facebook, Instagram, Twitter, Mail, MapPin, Lock } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useAuth } from '../contexts/AuthContext';
 import { Logo } from './Logo';
 
 export const Footer: React.FC = () => {
   const { t } = useLanguage();
+  const { currentUser } = useAuth();
 
   return (
     <footer className="bg-eveneo-dark text-white pt-16 pb-8">
@@ -33,7 +35,9 @@ export const Footer: React.FC = () => {
             <ul className="space-y-3 text-gray-400 text-sm">
               <li><Link to="/how-it-works" className="hover:text-white transition-colors">{t('footer.links.how')}</Link></li>
               <li><Link to="/search" className="hover:text-white transition-colors">{t('footer.links.services')}</Link></li>
-              <li><Link to="/pricing" className="hover:text-white transition-colors">{t('footer.links.pricing')}</Link></li>
+              {currentUser?.role !== 'client' && (
+                <li><Link to="/pricing" className="hover:text-white transition-colors">{t('footer.links.pricing')}</Link></li>
+              )}
               <li><Link to="/testimonials" className="hover:text-white transition-colors">{t('footer.links.testimonials')}</Link></li>
             </ul>
           </div>

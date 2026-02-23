@@ -45,15 +45,24 @@ import { MobileProviderDashboard } from './pages/mobile/MobileProviderDashboard'
 import { MobileProviderRequestsPage } from './pages/mobile/MobileProviderRequestsPage';
 import { MobileProviderMessagesPage } from './pages/mobile/MobileProviderMessagesPage';
 import { MobileProviderFinancePage } from './pages/mobile/MobileProviderFinancePage';
+import { MobileProviderProfileSettingsPage } from './pages/mobile/MobileProviderProfileSettingsPage';
+import { MobileProviderOrdersPage } from './pages/mobile/MobileProviderOrdersPage';
+import { MobileProviderAvailabilityPage } from './pages/mobile/MobileProviderAvailabilityPage';
+import { MobileProviderKYCPage } from './pages/mobile/MobileProviderKYCPage';
+import { MobileClientProfilePage } from './pages/mobile/MobileClientProfilePage';
+import { MobileProviderReviewsPage } from './pages/mobile/MobileProviderReviewsPage';
+import { MobileProviderFAQPage } from './pages/mobile/MobileProviderFAQPage';
 import { SmartAssistant } from './components/SmartAssistant';
 import { AuthProvider } from './contexts/AuthContext';
 import { CurrencyProvider } from './contexts/CurrencyContext';
 import { LanguageProvider } from './contexts/LanguageContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 import { ConnectivityProvider, useConnectivity } from './contexts/ConnectivityContext';
 import { ToastProvider } from './contexts/ToastContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { UserRole } from './types';
 import { WifiOff, RefreshCw, CloudOff } from 'lucide-react';
+import { useAuth } from './contexts/AuthContext';
 
 // Admin Components
 import { AdminLayout } from './components/AdminLayout';
@@ -105,19 +114,15 @@ const ConnectivityManager: React.FC<{ children: React.ReactNode }> = ({ children
   );
 };
 
-const App: React.FC = () => {
+// Composant pour gérer l'affichage conditionnel du footer
+const AppContent: React.FC = () => {
   const { isMobile } = useMobile();
+  const { isAuthenticated } = useAuth();
   
   return (
-    <AuthProvider>
-      <ToastProvider>
-        <ConnectivityProvider>
-          <CurrencyProvider>
-            <LanguageProvider>
-              <HashRouter>
-                <div className="min-h-screen flex flex-col font-sans text-eveneo-dark">
-                  <ConnectivityManager>
-                      <Routes>
+    <div className="min-h-screen flex flex-col font-sans text-eveneo-dark">
+      <ConnectivityManager>
+          <Routes>
                         {/* Admin Routes (Protected) */}
                         <Route path="/admin" element={
                           <ProtectedRoute requiredRole={UserRole.ADMIN}>
@@ -186,7 +191,7 @@ const App: React.FC = () => {
                                 <Route path="/event/:id" element={<ProtectedRoute><EventDetailsPage /></ProtectedRoute>} />
                                 <Route path="/checkout/:id" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
                                 <Route path="/settings" element={<ProtectedRoute>{isMobile ? <MobileProfilePage /> : <SettingsPage />}</ProtectedRoute>} />
-                                <Route path="/profile" element={<ProtectedRoute><MobileProfilePage /></ProtectedRoute>} />
+                                <Route path="/profile" element={<ProtectedRoute>{isMobile ? <MobileClientProfilePage /> : <SettingsPage />}</ProtectedRoute>} />
                                 <Route path="/categories" element={<ProtectedRoute>{isMobile ? <MobileCategoriesPage /> : <SearchPage />}</ProtectedRoute>} />
                                 <Route path="/booking/:providerId" element={<ProtectedRoute>{isMobile ? <MobileBookingPage /> : <ProviderProfilePage />}</ProtectedRoute>} />
                                 <Route path="/notifications" element={<ProtectedRoute>{isMobile ? <MobileNotificationsPage /> : <SettingsPage />}</ProtectedRoute>} />
@@ -194,6 +199,12 @@ const App: React.FC = () => {
                                 <Route path="/provider/requests" element={<ProtectedRoute requiredRole={UserRole.PROVIDER}>{isMobile ? <MobileProviderRequestsPage /> : <ProviderDashboard />}</ProtectedRoute>} />
                                 <Route path="/provider/messages" element={<ProtectedRoute requiredRole={UserRole.PROVIDER}>{isMobile ? <MobileProviderMessagesPage /> : <MessagesPage />}</ProtectedRoute>} />
                                 <Route path="/provider/finance" element={<ProtectedRoute requiredRole={UserRole.PROVIDER}>{isMobile ? <MobileProviderFinancePage /> : <WalletPage />}</ProtectedRoute>} />
+                                <Route path="/provider/profile" element={<ProtectedRoute requiredRole={UserRole.PROVIDER}>{isMobile ? <MobileProviderProfileSettingsPage /> : <SettingsPage />}</ProtectedRoute>} />
+                                <Route path="/provider/orders" element={<ProtectedRoute requiredRole={UserRole.PROVIDER}>{isMobile ? <MobileProviderOrdersPage /> : <OrdersPage />}</ProtectedRoute>} />
+                                <Route path="/provider/availability" element={<ProtectedRoute requiredRole={UserRole.PROVIDER}>{isMobile ? <MobileProviderAvailabilityPage /> : <ProviderDashboard />}</ProtectedRoute>} />
+                                <Route path="/provider/kyc" element={<ProtectedRoute requiredRole={UserRole.PROVIDER}>{isMobile ? <MobileProviderKYCPage /> : <SettingsPage />}</ProtectedRoute>} />
+                                <Route path="/provider/reviews" element={<ProtectedRoute requiredRole={UserRole.PROVIDER}>{isMobile ? <MobileProviderReviewsPage /> : <ReviewsPage />}</ProtectedRoute>} />
+                                                                <Route path="/provider/faq" element={<ProtectedRoute requiredRole={UserRole.PROVIDER}>{isMobile ? <MobileProviderFAQPage /> : <SettingsPage />}</ProtectedRoute>} />
                                 <Route path="/wallet" element={<ProtectedRoute><WalletPage /></ProtectedRoute>} />
                                 <Route path="/subscription" element={<ProtectedRoute><SubscriptionPage /></ProtectedRoute>} />
                                 <Route path="/payment/stripe" element={<ProtectedRoute><StripePaymentPage /></ProtectedRoute>} />
@@ -201,18 +212,34 @@ const App: React.FC = () => {
                               {/* Floating Smart Assistant available on all standard pages - hidden on mobile */}
                               {!isMobile && <SmartAssistant />}
                             </main>
-                            <Footer />
+                            {/* Masquer le footer quand l'utilisateur est connecté */}
+                            {!isAuthenticated && <Footer />}
                           </>
                         } />
                       </Routes>
                   </ConnectivityManager>
                 </div>
-              </HashRouter>
-            </LanguageProvider>
-          </CurrencyProvider>
-        </ConnectivityProvider>
-      </ToastProvider>
-    </AuthProvider>
+  );
+};
+
+// Composant App principal avec les providers
+const App: React.FC = () => {
+  return (
+    <ThemeProvider>
+      <AuthProvider>
+        <ToastProvider>
+          <ConnectivityProvider>
+            <CurrencyProvider>
+              <LanguageProvider>
+                <HashRouter>
+                  <AppContent />
+                </HashRouter>
+              </LanguageProvider>
+            </CurrencyProvider>
+          </ConnectivityProvider>
+        </ToastProvider>
+      </AuthProvider>
+    </ThemeProvider>
   );
 };
 

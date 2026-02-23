@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Home, Search, Calendar, MessageSquare, User } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface NavItem {
   icon: React.ElementType;
@@ -18,7 +19,13 @@ const navItems: NavItem[] = [
 
 export const MobileBottomNav: React.FC = () => {
   const location = useLocation();
+  const { isAuthenticated } = useAuth();
   const currentPath = location.pathname;
+
+  // Masquer le bottom nav quand l'utilisateur est connecté
+  if (isAuthenticated) {
+    return null;
+  }
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 safe-area-bottom z-50">

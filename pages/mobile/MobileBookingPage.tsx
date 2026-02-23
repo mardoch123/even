@@ -22,6 +22,7 @@ import { useCurrency } from '../../contexts/CurrencyContext';
 import { providerService, ServiceProvider } from '../../services/providerService';
 import { eventService } from '../../services/eventService';
 import { supabase } from '../../services/supabaseClient';
+import { UserRole } from '../../types';
 
 interface BookingStep {
   id: number;
@@ -57,6 +58,14 @@ export const MobileBookingPage: React.FC = () => {
   // Calendar data
   const [availableDates, setAvailableDates] = useState<Date[]>([]);
   const [currentMonth, setCurrentMonth] = useState(new Date());
+
+  // Rediriger les prestataires qui essaient de réserver
+  useEffect(() => {
+    if (currentUser?.role === UserRole.PROVIDER) {
+      navigate('/dashboard/provider', { replace: true });
+      return;
+    }
+  }, [currentUser, navigate]);
 
   useEffect(() => {
     const fetchProvider = async () => {

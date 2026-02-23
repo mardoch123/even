@@ -117,7 +117,8 @@ export const Navbar: React.FC = () => {
   const navLinks = [
     { name: t('nav.explore'), path: '/search' },
     { name: t('nav.howItWorks'), path: '/how-it-works' },
-    { name: t('nav.pricing'), path: '/pricing' },
+    // Masquer Tarif pour les clients connectés
+    ...(currentUser?.role === 'client' ? [] : [{ name: t('nav.pricing'), path: '/pricing' }]),
   ];
 
   const isLanding = location.pathname === '/';

@@ -19,7 +19,8 @@ import {
   Star,
   Award,
   Clock,
-  Image as ImageIcon
+  Image as ImageIcon,
+  HelpCircle
 } from 'lucide-react';
 import { MobileBottomNav } from '../../components/mobile/MobileBottomNav';
 import { useAuth } from '../../contexts/AuthContext';
@@ -129,7 +130,7 @@ export const MobileProviderProfileSettingsPage: React.FC = () => {
       icon: Star,
       label: 'Mes avis',
       value: `${provider?.reviewCount || 0} avis`,
-      path: `/provider/${currentUser?.id}/reviews`,
+      path: `/provider/reviews`,
       color: 'text-yellow-600',
       bgColor: 'bg-yellow-100'
     },
@@ -148,6 +149,14 @@ export const MobileProviderProfileSettingsPage: React.FC = () => {
       path: '/provider/calendar',
       color: 'text-teal-600',
       bgColor: 'bg-teal-100'
+    },
+    {
+      icon: HelpCircle,
+      label: 'Aide & FAQ',
+      value: '10 questions',
+      path: '/provider/faq',
+      color: 'text-indigo-600',
+      bgColor: 'bg-indigo-100'
     }
   ];
 

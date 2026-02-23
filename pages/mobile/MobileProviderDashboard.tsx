@@ -411,8 +411,13 @@ export const MobileProviderDashboard: React.FC = () => {
           <div className="space-y-2">
             {[
               { label: 'Voir mon profil public', path: `/provider/${currentUser?.id}`, icon: Eye },
-              { label: 'Gérer mes disponibilités', path: '/provider/calendar', icon: Calendar },
-              { label: 'Mes demandes en attente', path: '/provider/requests', icon: Clock3, badge: 5 },
+              { label: 'Gérer mes disponibilités', path: '/provider/availability', icon: Calendar },
+              { label: 'Mes demandes en attente', path: '/provider/requests', icon: Clock3, badge: stats.pendingRequests },
+              { label: 'Mes commandes', path: '/provider/orders', icon: FileText },
+              { label: 'Messagerie', path: '/provider/messages', icon: MessageSquare },
+              { label: 'Finances', path: '/provider/finance', icon: DollarSign },
+              { label: 'Mon profil', path: '/provider/profile', icon: User },
+              { label: 'Mes avis clients', path: '/provider/reviews', icon: Star },
               { label: 'Promouvoir mes services', path: '/promote', icon: TrendingUp }
             ].map((action, index) => (
               <button
