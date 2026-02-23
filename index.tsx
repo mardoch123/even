@@ -15,8 +15,11 @@ root.render(
   </React.StrictMode>
 );
 
-// Enregistrement du Service Worker pour rendre l'app PWA (Offline + Push)
-serviceWorkerRegistration.register({
-  onSuccess: () => console.log('PWA installée et prête hors-ligne.'),
-  onUpdate: () => console.log('Nouvelle version disponible.')
-});
+if (import.meta.env.PROD) {
+  serviceWorkerRegistration.register({
+    onSuccess: () => console.log('PWA installée et prête hors-ligne.'),
+    onUpdate: () => console.log('Nouvelle version disponible.')
+  });
+} else {
+  serviceWorkerRegistration.unregister();
+}

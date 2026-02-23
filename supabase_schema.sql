@@ -107,6 +107,29 @@ CREATE POLICY "Owners can update their service provider profile"
 ON public.service_providers FOR UPDATE 
 USING (auth.uid() = owner_id);
 
+CREATE TABLE public.provider_profile_views (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    provider_id UUID REFERENCES public.service_providers(id) ON DELETE CASCADE,
+    viewer_id UUID REFERENCES public.profiles(id),
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX provider_profile_views_provider_created_idx
+ON public.provider_profile_views (provider_id, created_at);
+
+ALTER TABLE public.provider_profile_views ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Providers can view their profile views" 
+ON public.provider_profile_views FOR SELECT 
+USING (EXISTS (SELECT 1 FROM public.service_providers WHERE service_providers.id = provider_profile_views.provider_id AND service_providers.owner_id = auth.uid()));
+
+CREATE POLICY "Anyone can insert profile views" 
+ON public.provider_profile_views FOR INSERT 
+WITH CHECK (
+    (auth.uid() IS NULL AND viewer_id IS NULL)
+    OR (auth.uid() = viewer_id)
+);
+
 -- -----------------------------------------------------------------------------
 -- 3. EVENTS
 -- -----------------------------------------------------------------------------

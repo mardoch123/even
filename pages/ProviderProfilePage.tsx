@@ -9,6 +9,7 @@ import { useToast } from '../contexts/ToastContext';
 import { reviewService, Review } from '../services/reviewService';
 import { providerService } from '../services/providerService';
 import { eventService } from '../services/eventService';
+import { supabase, supabaseConfigError } from '../services/supabaseClient';
 import { UserRole, ServiceProvider } from '../types';
 import { formatCityAndRadius, isProviderIdentityUnlockedByPlan, maskProviderDisplayName, sanitizeProviderText } from '../utils/providerPrivacy';
 import { getIndicativePriceRange } from '../utils/providerPricing';
@@ -129,7 +130,6 @@ export const ProviderProfilePage: React.FC = () => {
                     const storedWarranty = localStorage.getItem('provider_warranty_enabled');
                     const storedAvail = localStorage.getItem('provider_availability');
                     const storedPortfolio = localStorage.getItem('provider_portfolio');
-                    const storedKyc = localStorage.getItem('provider_kyc_status');
                     const storedIncluded = localStorage.getItem('provider_included_items');
                     const storedExcluded = localStorage.getItem('provider_excluded_items');
                     const storedPackages = localStorage.getItem('provider_packages');
@@ -154,7 +154,7 @@ export const ProviderProfilePage: React.FC = () => {
                             price: p.price,
                             description: p.desc
                         })) : DEFAULT_PROVIDER.addOns,
-                        verified: storedKyc === 'verified'
+                        verified: currentUser?.kycStatus === 'verified' || Boolean(currentUser?.isVerified)
                     });
                 } else if (id) {
                     // Fetch from Supabase
@@ -215,8 +215,26 @@ export const ProviderProfilePage: React.FC = () => {
             setReviews(reviewService.getReviewsByProvider(provider.id));
             const storedFavs = JSON.parse(localStorage.getItem('user_favorites') || '[]');
             setIsFavorite(storedFavs.includes(provider.id));
+
+            if (supabaseConfigError) return;
+            if (id === 'me') return;
+            if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(provider.id))) return;
+
+            const key = `eveneo_ppv_${provider.id}`;
+            const last = Number(localStorage.getItem(key) || '0');
+            const now = Date.now();
+            if (now - last < 60 * 60 * 1000) return;
+            localStorage.setItem(key, String(now));
+
+            const viewerId = currentUser?.id || null;
+            supabase
+              .from('provider_profile_views')
+              .insert({ provider_id: provider.id, viewer_id: viewerId })
+              .then(({ error }) => {
+                if (error) console.warn('provider_profile_views insert failed:', error);
+              });
         }
-    }, [provider?.id]);
+    }, [provider?.id, id, currentUser?.id]);
 
     useEffect(() => {
         const fetchCounts = async () => {

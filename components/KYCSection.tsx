@@ -60,6 +60,7 @@ export const KYCSection: React.FC<KYCSectionProps> = ({ status, onStatusChange }
         onStatusChange('pending');
     } catch (err: any) {
         const msg = String(err?.message || err);
+        console.error('KYC submit failed:', err);
         setError(msg);
     } finally {
         setIsLoading(false);

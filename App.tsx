@@ -5,18 +5,24 @@ import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
 import { LandingPage } from './pages/LandingPage';
 import { SearchPage } from './pages/SearchPage';
+import { MobileSearchPage } from './pages/mobile/MobileSearchPage';
 import { LoginPage } from './pages/LoginPage';
+import { MobileLoginPage } from './pages/mobile/MobileLoginPage';
 import { RegisterPage } from './pages/RegisterPage';
+import { useMobile } from './hooks/useMobile';
 import { OnboardingPage } from './pages/OnboardingPage';
 import { ClientDashboard } from './pages/ClientDashboard';
+import { MobileClientDashboard } from './pages/mobile/MobileClientDashboard';
 import { ProviderDashboard } from './pages/ProviderDashboard';
 import { ProviderProfilePage } from './pages/ProviderProfilePage';
 import { ProviderPromotePage } from './pages/ProviderPromotePage';
 import { MessagesPage } from './pages/MessagesPage';
+import { MobileMessagesPage } from './pages/mobile/MobileMessagesPage';
 import { EventDetailsPage } from './pages/EventDetailsPage';
 import { EventsPage } from './pages/EventsPage';
 import { CheckoutPage } from './pages/CheckoutPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { MobileProfilePage } from './pages/mobile/MobileProfilePage';
 import { ReviewsPage } from './pages/ReviewsPage';
 import { WalletPage } from './pages/WalletPage';
 import { StripePaymentPage } from './pages/StripePaymentPage';
@@ -30,6 +36,15 @@ import { FavoritesPage } from './pages/FavoritesPage';
 import { OfflineBlockerPage } from './pages/OfflineBlockerPage';
 import { PortfolioPage } from './pages/PortfolioPage';
 import { OrdersPage } from './pages/OrdersPage';
+import { MobileOrdersPage } from './pages/mobile/MobileOrdersPage';
+import { MobileCategoriesPage } from './pages/mobile/MobileCategoriesPage';
+import { MobileBookingPage } from './pages/mobile/MobileBookingPage';
+import { MobileNotificationsPage } from './pages/mobile/MobileNotificationsPage';
+import { MobileProviderProfilePage } from './pages/mobile/MobileProviderProfilePage';
+import { MobileProviderDashboard } from './pages/mobile/MobileProviderDashboard';
+import { MobileProviderRequestsPage } from './pages/mobile/MobileProviderRequestsPage';
+import { MobileProviderMessagesPage } from './pages/mobile/MobileProviderMessagesPage';
+import { MobileProviderFinancePage } from './pages/mobile/MobileProviderFinancePage';
 import { SmartAssistant } from './components/SmartAssistant';
 import { AuthProvider } from './contexts/AuthContext';
 import { CurrencyProvider } from './contexts/CurrencyContext';
@@ -91,6 +106,8 @@ const ConnectivityManager: React.FC<{ children: React.ReactNode }> = ({ children
 };
 
 const App: React.FC = () => {
+  const { isMobile } = useMobile();
+  
   return (
     <AuthProvider>
       <ToastProvider>
@@ -124,8 +141,8 @@ const App: React.FC = () => {
                             <main className="flex-grow relative">
                               <Routes>
                                 <Route path="/" element={<LandingPage />} />
-                                <Route path="/search" element={<SearchPage />} />
-                                <Route path="/login" element={<LoginPage />} />
+                                <Route path="/search" element={isMobile ? <MobileSearchPage /> : <SearchPage />} />
+                                <Route path="/login" element={isMobile ? <MobileLoginPage /> : <LoginPage />} />
                                 <Route path="/register" element={<RegisterPage />} />
                                 <Route path="/onboarding" element={<OnboardingPage />} />
                                 
@@ -139,20 +156,20 @@ const App: React.FC = () => {
                                 <Route path="/page/:type" element={<StaticPage />} />
                                 
                                 {/* Public Provider Profile */}
-                                <Route path="/provider/:id" element={<ProviderProfilePage />} />
+                                <Route path="/provider/:id" element={isMobile ? <MobileProviderProfilePage /> : <ProviderProfilePage />} />
                                 <Route path="/provider/:id/reviews" element={<ReviewsPage />} />
                                 
                                 {/* Secured Client Routes */}
                                 <Route path="/dashboard/client" element={
                                   <ProtectedRoute requiredRole={UserRole.CLIENT}>
-                                    <ClientDashboard />
+                                    {isMobile ? <MobileClientDashboard /> : <ClientDashboard />}
                                   </ProtectedRoute>
                                 } />
                                 
                                 {/* Secured Provider Routes */}
                                 <Route path="/dashboard/provider" element={
                                   <ProtectedRoute requiredRole={UserRole.PROVIDER}>
-                                    <ProviderDashboard />
+                                    {isMobile ? <MobileProviderDashboard /> : <ProviderDashboard />}
                                   </ProtectedRoute>
                                 } />
                                 <Route path="/promote" element={
@@ -163,19 +180,26 @@ const App: React.FC = () => {
 
                                 {/* Shared Secured Routes */}
                                 <Route path="/events" element={<ProtectedRoute><EventsPage /></ProtectedRoute>} />
-                                <Route path="/orders" element={<ProtectedRoute><OrdersPage /></ProtectedRoute>} />
+                                <Route path="/orders" element={<ProtectedRoute>{isMobile ? <MobileOrdersPage /> : <OrdersPage />}</ProtectedRoute>} />
                                 <Route path="/favorites" element={<ProtectedRoute><FavoritesPage /></ProtectedRoute>} />
-                                <Route path="/messages" element={<ProtectedRoute><MessagesPage /></ProtectedRoute>} />
+                                <Route path="/messages" element={<ProtectedRoute>{isMobile ? <MobileMessagesPage /> : <MessagesPage />}</ProtectedRoute>} />
                                 <Route path="/event/:id" element={<ProtectedRoute><EventDetailsPage /></ProtectedRoute>} />
                                 <Route path="/checkout/:id" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
-                                <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+                                <Route path="/settings" element={<ProtectedRoute>{isMobile ? <MobileProfilePage /> : <SettingsPage />}</ProtectedRoute>} />
+                                <Route path="/profile" element={<ProtectedRoute><MobileProfilePage /></ProtectedRoute>} />
+                                <Route path="/categories" element={<ProtectedRoute>{isMobile ? <MobileCategoriesPage /> : <SearchPage />}</ProtectedRoute>} />
+                                <Route path="/booking/:providerId" element={<ProtectedRoute>{isMobile ? <MobileBookingPage /> : <ProviderProfilePage />}</ProtectedRoute>} />
+                                <Route path="/notifications" element={<ProtectedRoute>{isMobile ? <MobileNotificationsPage /> : <SettingsPage />}</ProtectedRoute>} />
                                 <Route path="/portfolio" element={<ProtectedRoute requiredRole={UserRole.PROVIDER}><PortfolioPage /></ProtectedRoute>} />
+                                <Route path="/provider/requests" element={<ProtectedRoute requiredRole={UserRole.PROVIDER}>{isMobile ? <MobileProviderRequestsPage /> : <ProviderDashboard />}</ProtectedRoute>} />
+                                <Route path="/provider/messages" element={<ProtectedRoute requiredRole={UserRole.PROVIDER}>{isMobile ? <MobileProviderMessagesPage /> : <MessagesPage />}</ProtectedRoute>} />
+                                <Route path="/provider/finance" element={<ProtectedRoute requiredRole={UserRole.PROVIDER}>{isMobile ? <MobileProviderFinancePage /> : <WalletPage />}</ProtectedRoute>} />
                                 <Route path="/wallet" element={<ProtectedRoute><WalletPage /></ProtectedRoute>} />
                                 <Route path="/subscription" element={<ProtectedRoute><SubscriptionPage /></ProtectedRoute>} />
                                 <Route path="/payment/stripe" element={<ProtectedRoute><StripePaymentPage /></ProtectedRoute>} />
                               </Routes>
-                              {/* Floating Smart Assistant available on all standard pages */}
-                              <SmartAssistant />
+                              {/* Floating Smart Assistant available on all standard pages - hidden on mobile */}
+                              {!isMobile && <SmartAssistant />}
                             </main>
                             <Footer />
                           </>

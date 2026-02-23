@@ -16,6 +16,19 @@ const withTimeout = async <T,>(promiseLike: any, ms: number): Promise<T> => {
     }
 };
 
+// Retry wrapper for Supabase calls
+const withRetry = async <T,>(fn: () => Promise<T>, retries = 3, delay = 1000): Promise<T> => {
+    for (let i = 0; i < retries; i++) {
+        try {
+            return await fn();
+        } catch (error) {
+            if (i === retries - 1) throw error;
+            await new Promise(resolve => setTimeout(resolve, delay * (i + 1)));
+        }
+    }
+    throw new Error('Max retries reached');
+};
+
 const FALLBACK_PROVIDERS: ServiceProvider[] = [
     {
         id: 'demo-dj',
@@ -151,14 +164,18 @@ export const providerService = {
             if (supabaseConfigError) {
                 return FALLBACK_PROVIDERS.find(p => p.id === id) || null;
             }
-            const { data, error } = await withTimeout<SupabaseResult<any>>(
-                supabase
-                    .from('service_providers')
-                    .select('*')
-                    .eq('id', id)
-                    .single(),
-                6500
-            );
+            
+            // Use retry mechanism for better reliability
+            const { data, error } = await withRetry(async () => {
+                return await withTimeout<SupabaseResult<any>>(
+                    supabase
+                        .from('service_providers')
+                        .select('*')
+                        .eq('id', id)
+                        .single(),
+                    10000 // Increased timeout to 10s
+                );
+            }, 3, 1000);
 
             if (error) {
                 console.error('Error fetching provider:', error);
@@ -215,6 +232,68 @@ export const providerService = {
         } catch (e) {
             console.error('Error searching providers:', e);
             return filterFallbackProviders(query, category, location);
+        }
+    },
+
+    // Get unique locations from providers
+    async getUniqueLocations(): Promise<string[]> {
+        try {
+            if (supabaseConfigError) {
+                // Extract unique locations from fallback providers
+                const locations = FALLBACK_PROVIDERS.map(p => p.location);
+                return [...new Set(locations)];
+            }
+            
+            const { data, error } = await withTimeout<any>(
+                supabase.from('service_providers').select('location'),
+                6500
+            );
+
+            if (error) {
+                console.error('Error fetching locations:', error);
+                return [];
+            }
+
+            const locations = (data || [])
+                .map((item: any) => item.location)
+                .filter((loc: string) => loc && loc.trim() !== '');
+            
+            // Remove duplicates and sort
+            return [...new Set(locations)].sort() as string[];
+        } catch (e) {
+            console.error('Error fetching locations:', e);
+            return [];
+        }
+    },
+
+    // Get unique categories from providers
+    async getUniqueCategories(): Promise<string[]> {
+        try {
+            if (supabaseConfigError) {
+                // Extract unique categories from fallback providers
+                const categories = FALLBACK_PROVIDERS.map(p => p.category);
+                return [...new Set(categories)];
+            }
+            
+            const { data, error } = await withTimeout<any>(
+                supabase.from('service_providers').select('category'),
+                6500
+            );
+
+            if (error) {
+                console.error('Error fetching categories:', error);
+                return [];
+            }
+
+            const categories = (data || [])
+                .map((item: any) => item.category)
+                .filter((cat: string) => cat && cat.trim() !== '');
+            
+            // Remove duplicates and sort
+            return [...new Set(categories)].sort() as string[];
+        } catch (e) {
+            console.error('Error fetching categories:', e);
+            return [];
         }
     }
 };

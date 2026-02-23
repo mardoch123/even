@@ -63,33 +63,25 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 setLoading(false);
                 return;
             }
-            const timeoutMs = 7000;
-            let timedOut = false;
-
-            const timeout = new Promise<null>((resolve) => {
-                window.setTimeout(() => {
-                    timedOut = true;
-                    resolve(null);
-                }, timeoutMs);
-            });
+            const timeoutMs = 15000; // Increased timeout to 15s
 
             try {
-                const sessionResult = await Promise.race([
+                const sessionResult = await withTimeout(
                     supabase.auth.getSession(),
-                    timeout
-                ]);
+                    timeoutMs
+                );
 
-                if (timedOut || !sessionResult || !(sessionResult as any).data) {
+                if (!sessionResult || !(sessionResult as any).data) {
+                    setLoading(false);
                     return;
                 }
 
                 const { data: { session } } = sessionResult as any;
                 if (session?.user) {
-                    const user = await Promise.race([
+                    const user = await withTimeout(
                         fetchProfile(session.user.id),
-                        timeout
-                    ]);
-                    if (timedOut) return;
+                        timeoutMs
+                    );
 
                     if (user) {
                         setCurrentUser(user as any);
@@ -111,16 +103,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         void initAuth();
 
         const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-            try {
-                if (session?.user) {
-                    const user = await fetchProfile(session.user.id);
-                    setCurrentUser(user);
-                } else if (event === 'SIGNED_OUT') {
-                    setCurrentUser(null);
-                    clearLocalAuthState();
-                }
-            } catch (e) {
-                console.error('Auth state change error:', e);
+            // Don't block - handle async in background
+            if (session?.user) {
+                fetchProfile(session.user.id)
+                    .then(user => setCurrentUser(user))
+                    .catch(e => console.error('Auth state change error:', e));
+            } else if (event === 'SIGNED_OUT') {
+                setCurrentUser(null);
+                clearLocalAuthState();
             }
         });
         return () => authListener.subscription.unsubscribe();

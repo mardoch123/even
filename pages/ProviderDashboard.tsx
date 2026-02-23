@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { TrendingUp, Users, Calendar as CalendarIcon, Settings, DollarSign, Check, X, AlertCircle, Lock, Zap, Siren, ArrowRight, Filter, Rocket, Eye, MousePointer, ShoppingBag, Globe, Clock } from 'lucide-react';
 import { Button } from '../components/Button';
 import { KYCSection } from '../components/KYCSection';
@@ -7,7 +7,9 @@ import { KYCStatus, ServiceProvider } from '../types';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { replacementService } from '../services/replacementService';
-import { adsService, AdCampaign, AdSettings } from '../services/adsService';
+import { adsService, AdSettings } from '../services/adsService';
+import { supabase, supabaseConfigError } from '../services/supabaseClient';
+import { eventService, EventItemRow } from '../services/eventService';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { useToast } from '../contexts/ToastContext';
 
@@ -20,6 +22,14 @@ type DemoRequest = {
   status: 'pending' | 'accepted' | 'rejected';
 };
 
+type ProviderStats = {
+  revenue: number;
+  views: number;
+  reservations: number;
+  conversion: string;
+  graph: number[];
+};
+
 export const ProviderDashboard: React.FC = () => {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
@@ -30,7 +40,7 @@ export const ProviderDashboard: React.FC = () => {
       const fromProfile = (currentUser?.kycStatus as KYCStatus | undefined) || undefined;
       if (fromProfile) return fromProfile;
       if (currentUser?.isVerified) return 'verified';
-      return (localStorage.getItem('provider_kyc_status') as KYCStatus) || 'none';
+      return 'none';
   });
   const [urgentOpportunities, setUrgentOpportunities] = useState<any[]>([]);
   
@@ -42,51 +52,157 @@ export const ProviderDashboard: React.FC = () => {
   
   const [revenueFilter, setRevenueFilter] = useState<TimeRange>('30d');
 
+  const [stats, setStats] = useState<ProviderStats>({
+    revenue: 0,
+    views: 0,
+    reservations: 0,
+    conversion: '0%',
+    graph: [0, 0, 0, 0, 0, 0, 0]
+  });
+
   useEffect(() => {
     const fromProfile = (currentUser?.kycStatus as KYCStatus | undefined) || undefined;
-    const effective: KYCStatus = fromProfile || (currentUser?.isVerified ? 'verified' : kycStatus);
-    if (effective !== kycStatus) {
-        setKycStatus(effective);
-        return;
+    if (fromProfile && fromProfile !== kycStatus) {
+      setKycStatus(fromProfile);
+      return;
     }
-    localStorage.setItem('provider_kyc_status', effective);
+    if (currentUser?.isVerified && kycStatus !== 'verified') {
+      setKycStatus('verified');
+    }
+  }, [currentUser?.kycStatus, currentUser?.isVerified]);
+
+  useEffect(() => {
     setAdSettings(adsService.getSettings());
-    
-    const myCategory = 'Traiteur'; 
-    const myBasePrice = 50; 
-    
+
+    const myCategory = 'Traiteur';
+    const myBasePrice = 50;
+
     const ops = replacementService.getOpportunitiesForProvider(myCategory, myBasePrice);
     setUrgentOpportunities(ops);
 
-    // Load blocked dates
     const allBlocks = JSON.parse(localStorage.getItem('eveneo_blocked_dates') || '[]');
     if (currentUser) {
-        // For demo, we match string "p1" if user is p1, or generic provider check
-        // In real app: filter by providerId
-        setClientBlocks(allBlocks.filter((b: any) => b.providerId === currentUser.id || b.providerId === '1')); 
+      setClientBlocks(allBlocks.filter((b: any) => b.providerId === currentUser.id || b.providerId === '1'));
     }
 
     const interval = setInterval(() => {
-        setUrgentOpportunities(replacementService.getOpportunitiesForProvider(myCategory, myBasePrice));
+      setUrgentOpportunities(replacementService.getOpportunitiesForProvider(myCategory, myBasePrice));
     }, 30000);
 
     return () => clearInterval(interval);
-  }, [kycStatus, currentUser]);
+  }, [currentUser]);
 
-  const stats = useMemo(() => {
-      switch (revenueFilter) {
-          case '7d':
-              return { revenue: 850, views: 340, reservations: 2, conversion: '2.8%', graph: [20, 45, 30, 60, 50, 80, 70] };
-          case '30d':
-              return { revenue: 2450, views: 1203, reservations: 8, conversion: '4.2%', graph: [40, 60, 45, 70, 85, 65, 90] };
-          case '1y':
-              return { revenue: 32500, views: 15400, reservations: 85, conversion: '3.9%', graph: [60, 55, 70, 80, 65, 85, 95] }; 
-          case 'all':
-              return { revenue: 45200, views: 22000, reservations: 112, conversion: '3.5%', graph: [50, 60, 65, 70, 75, 80, 85] };
-          default:
-              return { revenue: 0, views: 0, reservations: 0, conversion: '0%', graph: [] };
+  useEffect(() => {
+    const loadStats = async () => {
+      if (!currentUser?.id) {
+        setStats({ revenue: 0, views: 0, reservations: 0, conversion: '0%', graph: [0, 0, 0, 0, 0, 0, 0] });
+        return;
       }
-  }, [revenueFilter]);
+
+      if (supabaseConfigError) {
+        setStats({ revenue: 0, views: 0, reservations: 0, conversion: '0%', graph: [0, 0, 0, 0, 0, 0, 0] });
+        return;
+      }
+
+      const now = new Date();
+      const end = now;
+      let start: Date | null = null;
+      if (revenueFilter === '7d') start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      if (revenueFilter === '30d') start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      if (revenueFilter === '1y') start = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+
+      try {
+        const { data: providerRow, error: providerErr } = await supabase
+          .from('service_providers')
+          .select('id')
+          .eq('owner_id', currentUser.id)
+          .order('created_at', { ascending: true })
+          .limit(1)
+          .maybeSingle();
+
+        if (providerErr) throw providerErr;
+        const providerId = providerRow?.id as string | undefined;
+        if (!providerId) {
+          setStats({ revenue: 0, views: 0, reservations: 0, conversion: '0%', graph: [0, 0, 0, 0, 0, 0, 0] });
+          return;
+        }
+
+        const items = await eventService.getEventItemsByProviderId(providerId);
+        const filtered = (items || []).filter((it: EventItemRow) => {
+          const ts = it.created_at || null;
+          if (!ts) return false;
+          const d = new Date(ts);
+          if (Number.isNaN(d.getTime())) return false;
+          if (start && d < start) return false;
+          return d <= end;
+        });
+
+        const consideredStatuses = new Set(['confirmed', 'completed_by_provider', 'validated_by_client']);
+
+        let revenue = 0;
+        let reservations = 0;
+        for (const it of filtered) {
+          if (!consideredStatuses.has(String(it.status))) continue;
+          revenue += Number(it.price || 0);
+          reservations += 1;
+        }
+
+        let graphStart = start;
+        if (!graphStart) {
+          const createdDates = filtered
+            .map(i => (i.created_at ? new Date(i.created_at) : null))
+            .filter((d): d is Date => Boolean(d) && !Number.isNaN(d.getTime()));
+          graphStart = createdDates.length > 0 ? new Date(Math.min(...createdDates.map(d => d.getTime()))) : new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        }
+
+        const buckets = new Array(7).fill(0) as number[];
+        const rangeMs = Math.max(1, end.getTime() - graphStart.getTime());
+        for (const it of filtered) {
+          if (!consideredStatuses.has(String(it.status))) continue;
+          if (!it.created_at) continue;
+          const d = new Date(it.created_at);
+          if (Number.isNaN(d.getTime())) continue;
+          const raw = (d.getTime() - graphStart.getTime()) / rangeMs;
+          const idx = Math.min(6, Math.max(0, Math.floor(raw * 7)));
+          buckets[idx] += Number(it.price || 0);
+        }
+
+        const max = Math.max(0, ...buckets);
+        const graph = buckets.map(v => {
+          if (max <= 0) return 0;
+          return Math.round((v / max) * 100);
+        });
+
+        let views = 0;
+        try {
+          let viewsQuery = supabase
+            .from('provider_profile_views')
+            .select('id', { count: 'exact', head: true })
+            .eq('provider_id', providerId)
+            .lte('created_at', end.toISOString());
+
+          if (start) {
+            viewsQuery = viewsQuery.gte('created_at', start.toISOString());
+          }
+
+          const { count, error: viewsErr } = await viewsQuery;
+          if (viewsErr) throw viewsErr;
+          views = Number(count || 0);
+        } catch (e) {
+          views = 0;
+        }
+
+        const conversion = views > 0 ? `${Math.round((reservations / views) * 1000) / 10}%` : '0%';
+
+        setStats({ revenue, views, reservations, conversion, graph });
+      } catch (e) {
+        console.error('Failed to load provider stats:', e);
+        setStats({ revenue: 0, views: 0, reservations: 0, conversion: '0%', graph: [0, 0, 0, 0, 0, 0, 0] });
+      }
+    };
+
+    loadStats();
+  }, [currentUser?.id, revenueFilter]);
 
   const handleAcceptOpportunity = async (op: any) => {
       if (confirm(`Voulez-vous reprendre la mission "${op.eventName}" immédiatement ?`)) {

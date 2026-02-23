@@ -80,11 +80,15 @@ Deno.serve(async (req) => {
       return json({ error: `Target profile error: ${targetError?.message || 'missing email'}` }, 400, corsHeaders);
     }
 
-    const resendKey = Deno.env.get('RESEND_API_KEY') || '';
-    const from = Deno.env.get('RESEND_FROM') || 'Eveneo <no-reply@eveneo.app>';
+    const brevoKey = Deno.env.get('BREVO_API_KEY') || '';
+    const senderEmail = Deno.env.get('BREVO_SENDER_EMAIL') || '';
+    const senderName = Deno.env.get('BREVO_SENDER_NAME') || 'Eveneo';
 
-    if (!resendKey) {
-      return json({ error: 'Missing RESEND_API_KEY' }, 500, corsHeaders);
+    if (!brevoKey) {
+      return json({ error: 'Missing BREVO_API_KEY' }, 500, corsHeaders);
+    }
+    if (!senderEmail) {
+      return json({ error: 'Missing BREVO_SENDER_EMAIL' }, 500, corsHeaders);
     }
 
     const subject = status === 'approved'
@@ -97,23 +101,31 @@ Deno.serve(async (req) => {
       ? `<p>${name},</p><p>Votre vérification d'identité a été approuvée. Vous pouvez maintenant recevoir des demandes et être payé sur Événéo.</p><p>L'équipe Événéo</p>`
       : `<p>${name},</p><p>Votre vérification d'identité a été refusée.</p>${reason ? `<p>Motif: ${reason}</p>` : ''}<p>Merci de soumettre de nouveaux documents depuis votre espace prestataire.</p><p>L'équipe Événéo</p>`;
 
-    const emailRes = await fetch('https://api.resend.com/emails', {
+    const emailRes = await fetch('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${resendKey}`,
         'Content-Type': 'application/json',
+        'api-key': brevoKey,
       },
       body: JSON.stringify({
-        from,
-        to: [targetProfile.email],
+        sender: {
+          name: senderName,
+          email: senderEmail,
+        },
+        to: [
+          {
+            email: targetProfile.email,
+            name: targetProfile.full_name || undefined,
+          },
+        ],
         subject,
-        html,
+        htmlContent: html,
       }),
     });
 
     if (!emailRes.ok) {
       const txt = await emailRes.text();
-      return json({ error: `Resend error: ${txt}` }, 500, corsHeaders);
+      return json({ error: `Brevo error: ${txt}` }, 500, corsHeaders);
     }
 
     return json({ ok: true }, 200, corsHeaders);
