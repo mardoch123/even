@@ -145,3 +145,19 @@
 .dark ::-webkit-scrollbar-thumb:hover {
   background: #525252;
 }
+
+/* Animated gradient for hero title */
+@keyframes gradient {
+  0%, 100% {
+    background-size: 200% 200%;
+    background-position: left center;
+  }
+  50% {
+    background-size: 200% 200%;
+    background-position: right center;
+  }
+}
+
+.animate-gradient {
+  animation: gradient 3s ease infinite;
+}
