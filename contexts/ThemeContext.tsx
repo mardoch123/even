@@ -31,13 +31,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
 
   useEffect(() => {
     setMounted(true);
-    // Check localStorage and system preference
-    const stored = localStorage.getItem(STORAGE_KEY) as Theme | null;
-    if (stored) {
-      setThemeState(stored);
-    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      setThemeState('dark');
-    }
+    setThemeState('light');
   }, []);
 
   useEffect(() => {
@@ -45,22 +39,18 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     
     // Apply theme to document
     const root = document.documentElement;
-    if (theme === 'dark') {
-      root.classList.add('dark');
-    } else {
-      root.classList.remove('dark');
-    }
+    root.classList.remove('dark');
     
     // Store preference
-    localStorage.setItem(STORAGE_KEY, theme);
+    localStorage.setItem(STORAGE_KEY, 'light');
   }, [theme, mounted]);
 
   const setTheme = (newTheme: Theme) => {
-    setThemeState(newTheme);
+    setThemeState(newTheme === 'dark' ? 'light' : 'light');
   };
 
   const toggleTheme = () => {
-    setThemeState(prev => prev === 'light' ? 'dark' : 'light');
+    setThemeState('light');
   };
 
   // Prevent flash of wrong theme
@@ -73,7 +63,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
       theme, 
       toggleTheme, 
       setTheme,
-      isDark: theme === 'dark' 
+      isDark: false
     }}>
       {children}
     </ThemeContext.Provider>

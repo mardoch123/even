@@ -18,6 +18,7 @@ import { supabase, supabaseConfigError } from '../services/supabaseClient';
 
 interface AuthContextType {
     currentUser: User | null;
+    isAuthenticated: boolean;
     loading: boolean;
     login: (identifier: string, password: string) => Promise<void>;
     loginWithProvider: (provider: 'google' | 'facebook' | 'apple', role?: UserRole) => Promise<void>;
@@ -40,6 +41,16 @@ export const useAuth = () => {
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [currentUser, setCurrentUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
+
+    const normalizeRole = (raw: any): UserRole => {
+        const v = String(raw || '').trim();
+        if (!v) return UserRole.CLIENT;
+        const upper = v.toUpperCase();
+        if (upper === UserRole.ADMIN) return UserRole.ADMIN;
+        if (upper === UserRole.PROVIDER) return UserRole.PROVIDER;
+        if (upper === UserRole.CLIENT) return UserRole.CLIENT;
+        return UserRole.CLIENT;
+    };
 
     const clearLocalAuthState = () => {
         try {
@@ -153,7 +164,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             id: data.id,
             email: data.email,
             name: data.full_name || 'Utilisateur',
-            role: (data.role as UserRole) || UserRole.CLIENT,
+            role: normalizeRole(data.role),
             avatarUrl: data.avatar_url,
             isVerified: data.is_verified,
             kycStatus: data.kyc_status,
@@ -224,7 +235,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 supabase.auth.signInWithOAuth({
                     provider: provider,
                     options: {
-                        redirectTo: window.location.origin + '/#/',
+                        redirectTo: window.location.origin + '/#/auth/callback',
                         queryParams: { role: role }
                     }
                 }),
@@ -359,6 +370,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     const value: AuthContextType = {
         currentUser,
+        isAuthenticated: !!currentUser,
         loading,
         login,
         loginWithProvider,

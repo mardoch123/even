@@ -9,6 +9,9 @@ import { MobileSearchPage } from './pages/mobile/MobileSearchPage';
 import { LoginPage } from './pages/LoginPage';
 import { MobileLoginPage } from './pages/mobile/MobileLoginPage';
 import { RegisterPage } from './pages/RegisterPage';
+import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
+import { ResetPasswordPage } from './pages/ResetPasswordPage';
+import { AuthCallbackPage } from './pages/AuthCallbackPage';
 import { useMobile } from './hooks/useMobile';
 import { OnboardingPage } from './pages/OnboardingPage';
 import { ClientDashboard } from './pages/ClientDashboard';
@@ -149,6 +152,9 @@ const AppContent: React.FC = () => {
                                 <Route path="/search" element={isMobile ? <MobileSearchPage /> : <SearchPage />} />
                                 <Route path="/login" element={isMobile ? <MobileLoginPage /> : <LoginPage />} />
                                 <Route path="/register" element={<RegisterPage />} />
+                                <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                                <Route path="/reset-password" element={<ResetPasswordPage />} />
+                                <Route path="/auth/callback" element={<AuthCallbackPage />} />
                                 <Route path="/onboarding" element={<OnboardingPage />} />
                                 
                                 {/* Dedicated Public Pages */}

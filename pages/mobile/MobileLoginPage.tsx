@@ -29,9 +29,9 @@ export const MobileLoginPage: React.FC = () => {
   useEffect(() => {
     if (currentUser) {
       // Rediriger vers le dashboard correspondant au rôle
-      if (currentUser.role === 'admin') {
+      if (currentUser.role === UserRole.ADMIN) {
         navigate('/admin/dashboard', { replace: true });
-      } else if (currentUser.role === 'provider') {
+      } else if (currentUser.role === UserRole.PROVIDER) {
         navigate('/dashboard/provider', { replace: true });
       } else {
         navigate('/dashboard/client', { replace: true });
@@ -60,7 +60,7 @@ export const MobileLoginPage: React.FC = () => {
     setError('');
     try {
       await loginWithProvider('google', signupRole);
-      navigate('/', { replace: true });
+      // Ne pas naviguer manuellement: Supabase redirige vers /#/auth/callback
     } catch (err) {
       setError(String((err as any)?.message || 'Erreur lors de la connexion Google'));
     } finally {

@@ -54,7 +54,7 @@ export const MobileClientProfilePage: React.FC = () => {
   const { currentUser, logout, updateProfile } = useAuth();
   const { formatPrice } = useCurrency();
   const { language, setLanguage, t } = useLanguage();
-  const { isDark, toggleTheme } = useTheme();
+  const { isDark } = useTheme();
   
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
@@ -578,7 +578,7 @@ export const MobileClientProfilePage: React.FC = () => {
               </div>
             </div>
             <button
-              onClick={toggleTheme}
+              disabled
               className={`w-12 h-6 rounded-full transition-colors ${
                 isDark ? 'bg-eveneo-blue' : 'bg-gray-300'
               }`}

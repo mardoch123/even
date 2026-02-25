@@ -45,9 +45,9 @@ export const LoginPage: React.FC = () => {
   useEffect(() => {
     if (currentUser) {
       // Rediriger vers le dashboard correspondant au rôle
-      if (currentUser.role === 'admin') {
+      if (currentUser.role === UserRole.ADMIN) {
         navigate('/admin/dashboard', { replace: true });
-      } else if (currentUser.role === 'provider') {
+      } else if (currentUser.role === UserRole.PROVIDER) {
         navigate('/dashboard/provider', { replace: true });
       } else {
         navigate('/dashboard/client', { replace: true });
@@ -55,11 +55,11 @@ export const LoginPage: React.FC = () => {
     }
   }, [currentUser, navigate]);
 
-  const handlePostLoginRedirect = () => {
+  const handlePostLoginRedirect = (role?: UserRole) => {
     // Rediriger vers le dashboard correspondant au rôle
-    if (currentUser?.role === 'admin') {
+    if (role === UserRole.ADMIN) {
       navigate('/admin/dashboard', { replace: true });
-    } else if (currentUser?.role === 'provider') {
+    } else if (role === UserRole.PROVIDER) {
       navigate('/dashboard/provider', { replace: true });
     } else {
       navigate('/dashboard/client', { replace: true });
@@ -73,7 +73,8 @@ export const LoginPage: React.FC = () => {
     
     try {
       await login(identifier, password);
-      handlePostLoginRedirect();
+      // Redirection gérée aussi par le useEffect currentUser; ceci accélère si le state est déjà prêt
+      handlePostLoginRedirect(currentUser?.role);
     } catch (err: any) {
       console.error(err);
       setError(String(err?.message || err || 'Connexion impossible.'));
@@ -87,7 +88,7 @@ export const LoginPage: React.FC = () => {
       setError('');
       try {
           await loginWithProvider(provider, signupRole);
-          handlePostLoginRedirect();
+          handlePostLoginRedirect(signupRole);
       } catch (err) {
           setError(String((err as any)?.message || `Erreur lors de la connexion ${provider}`));
       } finally {
@@ -193,7 +194,7 @@ export const LoginPage: React.FC = () => {
                 <input type="checkbox" className="rounded border-gray-300 text-eveneo-violet focus:ring-eveneo-violet" />
                 Se souvenir de moi
                 </label>
-                <a href="#" className="text-eveneo-violet font-medium hover:underline">Mot de passe oublié ?</a>
+                <Link to="/forgot-password" className="text-eveneo-violet font-medium hover:underline">Mot de passe oublié ?</Link>
             </div>
 
             <Button 
