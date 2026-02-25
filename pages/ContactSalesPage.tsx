@@ -174,7 +174,7 @@ export const ContactSalesPage: React.FC = () => {
                         label="Téléphone" 
                         type="tel"
                         name="phone"
-                        placeholder="+33 6 00 00 00 00" 
+                        placeholder="+1 514 000 0000" 
                         required 
                         value={formData.phone}
                         onChange={handleChange}

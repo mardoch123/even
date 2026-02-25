@@ -219,7 +219,7 @@ export const ProviderDashboard: React.FC = () => {
   };
 
   // --- Ads Feature Logic ---
-  const providerCountry = (currentUser?.location || '').split(',').pop()?.trim() || 'France';
+  const providerCountry = (currentUser?.location || '').split(',').pop()?.trim() || 'Canada';
   const isAdsAllowedRegion = adSettings.allowedCountries.includes(providerCountry);
   const isAdsFeatureEnabled = adSettings.enabled;
 

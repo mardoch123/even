@@ -17,13 +17,22 @@ const corsHeaders: HeadersInit = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
+const buildCorsHeaders = (req: Request): HeadersInit => {
+  const reqHeaders = req.headers.get('Access-Control-Request-Headers');
+  if (!reqHeaders) return corsHeaders;
+  return {
+    ...corsHeaders,
+    'Access-Control-Allow-Headers': reqHeaders,
+  };
+};
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response('ok', { status: 200, headers: buildCorsHeaders(req) });
   }
 
   if (req.method !== 'POST') {
-    return json({ error: 'Method not allowed' }, 405, corsHeaders);
+    return json({ error: 'Method not allowed' }, 405, buildCorsHeaders(req));
   }
 
   try {
@@ -33,9 +42,9 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
 
-    if (!stripeSecretKey) return json({ error: 'Missing STRIPE_SECRET_KEY' }, 500, corsHeaders);
-    if (!appUrl) return json({ error: 'Missing APP_URL' }, 500, corsHeaders);
-    if (!supabaseUrl || !supabaseAnonKey) return json({ error: 'Missing Supabase env vars' }, 500, corsHeaders);
+    if (!stripeSecretKey) return json({ error: 'Missing STRIPE_SECRET_KEY' }, 500, buildCorsHeaders(req));
+    if (!appUrl) return json({ error: 'Missing APP_URL' }, 500, buildCorsHeaders(req));
+    if (!supabaseUrl || !supabaseAnonKey) return json({ error: 'Missing Supabase env vars' }, 500, buildCorsHeaders(req));
 
     const authHeader = req.headers.get('Authorization') || '';
 
@@ -45,7 +54,7 @@ Deno.serve(async (req) => {
 
     const { data: authData, error: authError } = await supabase.auth.getUser();
     if (authError || !authData?.user) {
-      return json({ error: 'Unauthorized' }, 401, corsHeaders);
+      return json({ error: 'Unauthorized' }, 401, buildCorsHeaders(req));
     }
 
     const payload = await req.json();
@@ -64,7 +73,7 @@ Deno.serve(async (req) => {
     const addOns = payload?.addOns ? String(payload.addOns) : '';
 
     if (!Number.isFinite(amount) || amount <= 0) {
-      return json({ error: 'Invalid amount' }, 400, corsHeaders);
+      return json({ error: 'Invalid amount' }, 400, buildCorsHeaders(req));
     }
 
     const stripe = new Stripe(stripeSecretKey, {
@@ -106,8 +115,8 @@ Deno.serve(async (req) => {
       ],
     });
 
-    return json({ url: session.url }, 200, corsHeaders);
+    return json({ url: session.url }, 200, buildCorsHeaders(req));
   } catch (e) {
-    return json({ error: String((e as any)?.message || e) }, 500, corsHeaders);
+    return json({ error: String((e as any)?.message || e) }, 500, buildCorsHeaders(req));
   }
 });

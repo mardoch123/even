@@ -39,18 +39,27 @@ export const ConnectivityProvider: React.FC<{ children: ReactNode }> = ({ childr
   // Active Connection Check (Ping)
   const checkConnection = async () => {
       try {
-          // Try to fetch a tiny resource or the current page with a cache-buster
-          const res = await fetch('/manifest.json?' + new Date().getTime(), { method: 'HEAD' });
-          if (res.ok) {
-              if (!isOnline) {
-                  setIsOnline(true);
-                  processQueue();
-              }
-          } else {
+          // Prefer the browser network status. A failed ping should not force offline
+          // (e.g. missing /manifest.json in some deployments).
+          if (!navigator.onLine) {
               setIsOnline(false);
+              return;
+          }
+
+          // Try a lightweight HEAD request against the app itself.
+          const url = `${window.location.origin}/?cb=${Date.now()}`;
+          const res = await fetch(url, { method: 'HEAD', cache: 'no-store' });
+
+          // If the app responds, we are online.
+          if (res.ok && !isOnline) {
+              setIsOnline(true);
+              processQueue();
           }
       } catch (e) {
-          setIsOnline(false);
+          // Do not switch to offline on transient fetch errors while navigator says online.
+          if (!navigator.onLine) {
+              setIsOnline(false);
+          }
       }
   };
 

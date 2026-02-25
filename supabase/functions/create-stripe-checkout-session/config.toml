@@ -1,0 +1,5 @@
+# Supabase Edge Function configuration
+# We disable platform-level JWT verification so that CORS preflight (OPTIONS)
+# doesn't get rejected with 401 before our code runs.
+# We still enforce auth inside the function using supabase.auth.getUser().
+verify_jwt = false

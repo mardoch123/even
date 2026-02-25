@@ -101,7 +101,7 @@ export const RegisterPage: React.FC = () => {
           <Input label="Nom complet" placeholder="Jean Dupont" icon={User} required value={name} onChange={(e) => setName(e.target.value)} />
           
           {role === UserRole.PROVIDER && (
-             <Input label="Numéro de téléphone (Vérification requise)" type="tel" placeholder="+33 6 12 34 56 78" icon={Phone} required value={phone} onChange={(e) => setPhone(e.target.value)} className="bg-blue-50 border-blue-100 focus:border-blue-300" />
+             <Input label="Numéro de téléphone (Vérification requise)" type="tel" placeholder="+1 514 123 4567" icon={Phone} required value={phone} onChange={(e) => setPhone(e.target.value)} className="bg-blue-50 border-blue-100 focus:border-blue-300" />
           )}
           
           <Input label="Email" type="email" placeholder="jean@exemple.com" icon={Mail} required value={email} onChange={(e) => setEmail(e.target.value)} />

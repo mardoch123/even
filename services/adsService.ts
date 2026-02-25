@@ -194,7 +194,7 @@ export const adsService = {
         const days = durationId === '30d' ? 30 : durationId === '7d' ? 7 : durationId === '3d' ? 3 : 1;
         end.setDate(end.getDate() + days);
 
-        const country = (provider.location || '').split(',').pop()?.trim() || 'France';
+        const country = (provider.location || '').split(',').pop()?.trim() || 'Canada';
 
         // AI MODERATION CHECK
         const analysis = await adsService.analyzeAdContent(creative);
