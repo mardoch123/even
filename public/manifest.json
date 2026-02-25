@@ -1,0 +1,23 @@
+{
+  "short_name": "Événéo",
+  "name": "Événéo - Plateforme Événementielle",
+  "icons": [
+    {
+      "src": "https://ui-avatars.com/api/?name=E&background=8A2DF9&color=fff&size=192&rounded=true&bold=true",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "https://ui-avatars.com/api/?name=E&background=8A2DF9&color=fff&size=512&rounded=true&bold=true",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#8A2DF9",
+  "background_color": "#F5F5F7",
+  "orientation": "portrait",
+  "description": "Trouvez, réservez et gérez vos prestataires événementiels en toute simplicité.",
+  "categories": ["productivity", "business", "events", "social"]
+}
