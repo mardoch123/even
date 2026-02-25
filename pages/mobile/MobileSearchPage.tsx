@@ -141,34 +141,6 @@ export const MobileSearchPage: React.FC = () => {
       </header>
 
       <main className="px-4 pt-4">
-        {/* Carte statistiques */}
-        <div className="bg-gradient-to-r from-eveneo-blue to-blue-500 rounded-2xl p-5 text-white shadow-lg">
-          <h2 className="text-lg font-semibold mb-4">Statistiques des prestataires</h2>
-          <div className="flex items-center justify-around">
-            <div className="text-center">
-              <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center mx-auto mb-2">
-                <Users size={20} />
-              </div>
-              <p className="text-2xl font-bold">{stats.total}</p>
-              <p className="text-sm text-white/80">Total</p>
-            </div>
-            <div className="text-center">
-              <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center mx-auto mb-2">
-                <Star size={20} />
-              </div>
-              <p className="text-2xl font-bold">{stats.premium}</p>
-              <p className="text-sm text-white/80">Premium</p>
-            </div>
-            <div className="text-center">
-              <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center mx-auto mb-2">
-                <BadgeCheck size={20} />
-              </div>
-              <p className="text-2xl font-bold">{stats.verified}</p>
-              <p className="text-sm text-white/80">Vérifiés</p>
-            </div>
-          </div>
-        </div>
-
         {/* Barre de recherche */}
         <div className="mt-4">
           <div className="relative">

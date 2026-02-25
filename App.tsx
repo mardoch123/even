@@ -12,6 +12,8 @@ import { RegisterPage } from './pages/RegisterPage';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { AuthCallbackPage } from './pages/AuthCallbackPage';
+import { PaymentSuccessPage } from './pages/PaymentSuccessPage';
+import { PaymentCancelPage } from './pages/PaymentCancelPage';
 import { useMobile } from './hooks/useMobile';
 import { OnboardingPage } from './pages/OnboardingPage';
 import { ClientDashboard } from './pages/ClientDashboard';
@@ -155,6 +157,8 @@ const AppContent: React.FC = () => {
                                 <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                                 <Route path="/reset-password" element={<ResetPasswordPage />} />
                                 <Route path="/auth/callback" element={<AuthCallbackPage />} />
+                                <Route path="/payment/success" element={<PaymentSuccessPage />} />
+                                <Route path="/payment/cancel" element={<PaymentCancelPage />} />
                                 <Route path="/onboarding" element={<OnboardingPage />} />
                                 
                                 {/* Dedicated Public Pages */}

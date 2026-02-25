@@ -6,6 +6,7 @@ import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../services/supabaseClient';
 import { eventService } from '../services/eventService';
 import { providerService } from '../services/providerService';
 import { AddOn, ServiceProvider } from '../types';
@@ -47,44 +48,7 @@ export const StripePaymentPage: React.FC = () => {
   const selectedAddOns: AddOn[] = (provider?.addOns || []).filter(a => selectedAddOnIds.includes(a.id));
   
   // Stripe Objects
-  const [stripe, setStripe] = useState<any>(null);
-  const [elements, setElements] = useState<any>(null);
-  const [cardElement, setCardElement] = useState<any>(null);
-
-  // Initialize Stripe
-  useEffect(() => {
-      const key = getStripeKey();
-      if (key && (window as any).Stripe) {
-          const stripeInstance = (window as any).Stripe(key);
-          setStripe(stripeInstance);
-          
-          // Create Elements instance
-          const elementsInstance = stripeInstance.elements();
-          setElements(elementsInstance);
-          
-          // Create Card Element
-          const card = elementsInstance.create('card', {
-              style: {
-                  base: {
-                      fontSize: '16px',
-                      color: '#32325d',
-                      fontFamily: '"Inter", sans-serif',
-                      '::placeholder': { color: '#aab7c4' },
-                  },
-                  invalid: { color: '#fa755a', iconColor: '#fa755a' },
-              },
-          });
-          
-          // Mount to DOM node if exists
-          const mountPoint = document.getElementById('card-element');
-          if (mountPoint) card.mount('#card-element');
-          setCardElement(card);
-
-          return () => {
-              card.destroy();
-          };
-      }
-  }, []);
+  const [stripeCheckoutUrl, setStripeCheckoutUrl] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchProvider = async () => {
@@ -107,42 +71,46 @@ export const StripePaymentPage: React.FC = () => {
     setIsLoading(true);
     setStripeError('');
 
-    // 1. REAL STRIPE FLOW (If Key Exists)
-    if (stripe && cardElement) {
-        setStep('processing');
-        try {
-            // Create Payment Method
-            const { error, paymentMethod } = await stripe.createPaymentMethod({
-                type: 'card',
-                card: cardElement,
-            });
-
-            if (error) {
-                throw new Error(error.message);
-            }
-
-            // Simulate Backend Confirmation (In real app: call your API with paymentMethod.id)
-            // await api.confirmPayment(paymentMethod.id, amount);
-            console.log("Stripe PaymentMethod Created:", paymentMethod.id);
-            
-            // Proceed to success
-            await completeSuccessFlow();
-
-        } catch (err: any) {
-            console.error("Stripe Error:", err);
-            setStripeError(err.message || "Le paiement a échoué.");
-            setStep('payment');
-            setIsLoading(false);
-        }
-        return;
-    }
-
-    // 2. SIMULATION FLOW (Fallback if no key)
-    console.warn("No Stripe Key found. Running in Simulation Mode.");
     setStep('processing');
-    setTimeout(() => {
-      void completeSuccessFlow();
-    }, 2000);
+
+    try {
+      const label = type === 'service_booking'
+        ? (providerName ? `Réservation - ${providerName}` : 'Réservation')
+        : type === 'wallet_topup'
+          ? 'Rechargement portefeuille'
+          : type === 'subscription'
+            ? 'Abonnement'
+            : 'Paiement Événéo';
+
+      const { data, error } = await supabase.functions.invoke('create-stripe-checkout-session', {
+        body: {
+          amount,
+          currency: 'eur',
+          type,
+          label,
+          providerId,
+          providerName,
+          date: dateToHold,
+          duration: durationStr,
+          serviceStartAt,
+          serviceEndAt,
+          addOns: addOnsStr,
+        },
+      });
+
+      if (error) throw error;
+
+      const url = (data as any)?.url as string | undefined;
+      if (!url) throw new Error('URL Stripe manquante.');
+
+      setStripeCheckoutUrl(url);
+      window.location.href = url;
+    } catch (err: any) {
+      console.error('Stripe Checkout Error:', err);
+      setStripeError(String(err?.message || err || 'Le paiement a échoué.'));
+      setStep('payment');
+      setIsLoading(false);
+    }
   };
 
   const completeSuccessFlow = async () => {
@@ -339,25 +307,15 @@ export const StripePaymentPage: React.FC = () => {
                  <div className="space-y-2">
                     <label className="block text-sm font-medium text-gray-700">Carte Bancaire</label>
                     <div className="border border-gray-300 rounded-lg p-3 bg-white focus-within:ring-2 focus-within:ring-indigo-500">
-                       {stripe ? (
-                           // Real Stripe Element Container
-                           <div id="card-element" className="py-2"></div>
-                       ) : (
-                           // Fallback UI (No Key configured)
-                           <div className="flex flex-col gap-2 opacity-60">
-                               <div className="flex items-center border-b pb-2">
-                                   <CreditCard size={20} className="text-gray-400 mr-2" />
-                                   <input className="w-full outline-none text-sm" placeholder="4242 4242 4242 4242" disabled />
-                               </div>
-                               <div className="flex gap-2">
-                                   <input className="w-1/2 border-r pr-2 outline-none text-sm" placeholder="MM / AA" disabled />
-                                   <input className="w-1/2 pl-2 outline-none text-sm" placeholder="CVC" disabled />
-                               </div>
-                               <p className="text-[10px] text-orange-600 font-bold mt-1">
-                                   Mode Démo (Ajoutez une clé Stripe pour activer)
-                               </p>
-                           </div>
-                       )}
+                       <div className="flex flex-col gap-2 opacity-60">
+                        <div className="flex items-center border-b pb-2">
+                          <CreditCard size={20} className="text-gray-400 mr-2" />
+                          <input className="w-full outline-none text-sm" placeholder="Paiement via Stripe" disabled />
+                        </div>
+                        <p className="text-[10px] text-gray-500 font-bold mt-1">
+                          Redirection vers Stripe Checkout
+                        </p>
+                      </div>
                     </div>
                  </div>
 
